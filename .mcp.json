@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=cxrckwyodmqpoznoubmx",
+      "headers": {
+        "Authorization": "Bearer sbp_eff7889d93983ac03c271d6f9db04f38d2d67926"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\Projects\\meal-planner"
+      ]
+    },
+            "vercel": {
+          "type": "http",
+          "url": "https://mcp.vercel.com"
+        }
+  }
+}

@@ -1,0 +1,63 @@
+-- Hogares
+create table households (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  persons int default 1,
+  invite_code text unique default substring(md5(random()::text), 1, 8),
+  created_at timestamp default now()
+);
+
+-- Miembros del hogar
+create table household_members (
+  id uuid default gen_random_uuid() primary key,
+  household_id uuid references households(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
+  role text default 'member',
+  created_at timestamp default now()
+);
+
+-- Recetas
+create table recipes (
+  id uuid default gen_random_uuid() primary key,
+  household_id uuid references households(id) on delete cascade,
+  name text not null,
+  portions int not null,
+  emoji text default '🍴',
+  category text not null default 'otros',
+  tags text[],
+  created_at timestamp default now()
+);
+
+-- Ingredientes
+create table ingredients (
+  id uuid default gen_random_uuid() primary key,
+  recipe_id uuid references recipes(id) on delete cascade,
+  name text not null,
+  quantity text not null
+);
+
+-- Planes semanales
+create table weekly_plans (
+  id uuid default gen_random_uuid() primary key,
+  household_id uuid references households(id) on delete cascade,
+  week_start date not null,
+  created_at timestamp default now(),
+  unique(household_id, week_start)
+);
+
+-- Slots del plan
+create table plan_slots (
+  id uuid default gen_random_uuid() primary key,
+  plan_id uuid references weekly_plans(id) on delete cascade,
+  day text not null,
+  meal_type text not null,
+  recipe_id uuid references recipes(id) on delete set null
+);
+
+-- Habilitar Row Level Security
+alter table households enable row level security;
+alter table household_members enable row level security;
+alter table recipes enable row level security;
+alter table ingredients enable row level security;
+alter table weekly_plans enable row level security;
+alter table plan_slots enable row level security;
