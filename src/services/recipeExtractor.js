@@ -53,6 +53,7 @@ Para emoji, elegí uno que represente bien el plato.`,
     maxTokens: 1500,
   })
 
-  const text = response.content[0].text.trim()
+  const raw = response.content[0].text.trim()
+  const text = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   return JSON.parse(text)
 }
