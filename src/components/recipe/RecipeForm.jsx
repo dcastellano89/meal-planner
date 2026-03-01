@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   category: 'otros',
   tags: '',
   ingredients: [{ name: '', quantity: '' }],
+  procedure: '',
 }
 
 export default function RecipeForm({ onSave, onClose, initialData = null }) {
@@ -24,6 +25,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
           ingredients: initialData.ingredients?.length
             ? initialData.ingredients.map((i) => ({ name: i.name, quantity: i.quantity }))
             : [{ name: '', quantity: '' }],
+          procedure: initialData.procedure || '',
         }
       : EMPTY_FORM
   )
@@ -57,6 +59,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
         category: form.category,
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
         ingredients: form.ingredients.filter((i) => i.name.trim()),
+        procedure: form.procedure.trim() || null,
       })
       onClose()
     } catch (e) {
@@ -75,6 +78,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
       ingredients: data.ingredients?.length
         ? data.ingredients.map((i) => ({ name: i.name, quantity: i.quantity }))
         : [{ name: '', quantity: '' }],
+      procedure: data.procedure || '',
     })
     setAddTab('review')
   }
@@ -230,6 +234,18 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
             <button className="btn btn-ghost btn-sm" onClick={addIngredient} style={{ marginTop: 4 }}>
               + Agregar ingrediente
             </button>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">Procedimiento <span style={{ fontWeight: 400, color: '#9CA3AF' }}>(opcional)</span></label>
+            <textarea
+              className="input-field"
+              placeholder="Describí los pasos para preparar esta receta..."
+              value={form.procedure}
+              onChange={(e) => setForm((f) => ({ ...f, procedure: e.target.value }))}
+              rows={5}
+              style={{ resize: 'vertical', lineHeight: 1.6 }}
+            />
           </div>
 
           {error && <p style={{ fontSize: 13, color: '#DC2626', marginBottom: 12 }}>{error}</p>}

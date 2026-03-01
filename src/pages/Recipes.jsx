@@ -113,6 +113,17 @@ export default function RecipesPage({ household }) {
             </div>
           ))}
 
+          {showDetail.procedure && (
+            <>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 20, marginBottom: 10 }}>
+                Procedimiento
+              </div>
+              <p style={{ fontSize: 14, color: '#1A1A1A', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                {showDetail.procedure}
+              </p>
+            </>
+          )}
+
           {deleteConfirm ? (
             <div style={{ marginTop: 20 }}>
               <p style={{ fontSize: 14, color: '#DC2626', marginBottom: 12, textAlign: 'center' }}>

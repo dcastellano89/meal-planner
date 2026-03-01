@@ -23,10 +23,10 @@ export default function useRecipes(householdId) {
     if (householdId) fetchRecipes()
   }, [fetchRecipes, householdId])
 
-  const createRecipe = async ({ name, portions, emoji, category, tags, ingredients }) => {
+  const createRecipe = async ({ name, portions, emoji, category, tags, ingredients, procedure }) => {
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
-      .insert({ household_id: householdId, name, portions, emoji, category, tags })
+      .insert({ household_id: householdId, name, portions, emoji, category, tags, procedure: procedure || null })
       .select()
       .single()
 
@@ -49,10 +49,10 @@ export default function useRecipes(householdId) {
     return recipe
   }
 
-  const updateRecipe = async (id, { name, portions, emoji, category, tags, ingredients }) => {
+  const updateRecipe = async (id, { name, portions, emoji, category, tags, ingredients, procedure }) => {
     const { error: recipeError } = await supabase
       .from('recipes')
-      .update({ name, portions, emoji, category, tags })
+      .update({ name, portions, emoji, category, tags, procedure: procedure || null })
       .eq('id', id)
 
     if (recipeError) throw recipeError

@@ -35,12 +35,14 @@ El JSON debe tener exactamente esta estructura:
   "tags": ["tag1", "tag2"],
   "ingredients": [
     { "name": "nombre del ingrediente", "quantity": "cantidad y unidad" }
-  ]
+  ],
+  "procedure": "pasos para preparar la receta"
 }
 Si no podés identificar algún campo, usá valores razonables por defecto.
 Para portions, estimá según la cantidad de ingredientes.
 Para category, elegí la más apropiada según los ingredientes principales.
-Para emoji, elegí uno que represente bien el plato.`,
+Para emoji, elegí uno que represente bien el plato.
+Para procedure: si la imagen contiene los pasos de preparación, extraelos. Si no están en la imagen, generá un procedimiento detallado y razonable basado en el nombre y los ingredientes identificados. Siempre incluí el procedimiento.`,
     messages: [
       {
         role: 'user',
