@@ -72,7 +72,7 @@ export default function ImageUploader({ onExtracted, onError }) {
         disabled={!files.length}
         style={{ opacity: files.length ? 1 : 0.5 }}
       >
-        {files.length ? `Analizar ${files.length} imagen${files.length > 1 ? 'es' : ''} con IA ✨` : 'Seleccioná imágenes primero'}
+        {files.length ? `Analizar ${files.length} imagen${files.length > 1 ? 'es' : ''} ✨` : 'Seleccioná imágenes primero'}
       </button>
     </>
   )

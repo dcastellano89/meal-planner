@@ -73,7 +73,7 @@ export default function JoinHouseholdPage({ inviteCode, user, onComplete, onCrea
 
             <button
               className="btn"
-              style={{ width: '100%', marginBottom: 12 }}
+              style={{ width: '100%', marginBottom: 12, padding: '16px 24px', fontSize: 16 }}
               onClick={handleJoin}
               disabled={joining}
             >

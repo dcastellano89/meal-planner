@@ -6,6 +6,7 @@ import useRecipes from '../hooks/useRecipes'
 import usePlanner from '../hooks/usePlanner'
 import { generateWeeklyMenu } from '../services/menuPlanner'
 import { formatWeekRange } from '../utils/portions'
+import { CATEGORIES } from '../components/recipe/CategoryFilter'
 
 const DAYS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom']
 const DAYS_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -17,6 +18,7 @@ export default function PlannerPage({ household }) {
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState('')
   const [slotPicker, setSlotPicker] = useState(null)
+  const [pickerCategory, setPickerCategory] = useState('todas')
 
   const handleGenerate = async () => {
     if (recipes.length < 1) return
@@ -29,6 +31,11 @@ export default function PlannerPage({ household }) {
       setGenerateError('No se pudo generar el menú. Intentá de nuevo.')
     }
     setGenerating(false)
+  }
+
+  const openSlotPicker = (day, mealType) => {
+    setPickerCategory('todas')
+    setSlotPicker({ day, mealType })
   }
 
   const handlePickRecipe = async (recipe) => {
@@ -116,7 +123,7 @@ export default function PlannerPage({ household }) {
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => setSlotPicker({ day: 'lun', mealType: 'lunch' })}
+              onClick={() => openSlotPicker('lun', 'lunch')}
             >
               Armar manualmente
             </button>
@@ -141,7 +148,7 @@ export default function PlannerPage({ household }) {
                     {['lunch', 'dinner'].map((mealType) => {
                       const recipe = slots[day]?.[mealType]
                       return (
-                        <div key={mealType} className="meal-slot" onClick={() => setSlotPicker({ day, mealType })}>
+                        <div key={mealType} className="meal-slot" onClick={() => openSlotPicker(day, mealType)}>
                           <div className="slot-label">{mealType === 'lunch' ? '🌤 Almuerzo' : '🌙 Cena'}</div>
                           {recipe ? (
                             <>
@@ -165,7 +172,7 @@ export default function PlannerPage({ household }) {
           )}
           <div style={{ padding: '8px 20px 16px' }}>
             <button className="btn btn-ghost" style={{ width: '100%' }} onClick={handleGenerate} disabled={generating}>
-              {generating ? '✨ Generando...' : '✨ Regenerar con IA'}
+              {generating ? '✨ Generando...' : '✨ Regenerar menú'}
             </button>
           </div>
         </>
@@ -181,24 +188,44 @@ export default function PlannerPage({ household }) {
             <p style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '24px 0' }}>
               No tenés recetas cargadas todavía.
             </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {recipes.map((r) => (
-                <div key={r.id} className="recipe-card" onClick={() => handlePickRecipe(r)}>
-                  <div className="recipe-emoji" style={{ width: 44, height: 44, fontSize: 24 }}>{r.emoji}</div>
-                  <div className="recipe-info">
-                    <div className="recipe-name">{r.name}</div>
-                    <div className="recipe-meta">🍽️ {r.portions} porciones</div>
-                  </div>
+          ) : (() => {
+            const visibleCats = CATEGORIES.filter((c) => c.id === 'todas' || recipes.some((r) => r.category === c.id))
+            const filtered = pickerCategory === 'todas' ? recipes : recipes.filter((r) => r.category === pickerCategory)
+            return (
+              <>
+                <div className="pill-tabs" style={{ marginBottom: 12 }}>
+                  {visibleCats.map((cat) => (
+                    <button
+                      key={cat.id}
+                      className={`pill-tab ${pickerCategory === cat.id ? 'active' : ''}`}
+                      onClick={() => setPickerCategory(cat.id)}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {filtered.map((r) => (
+                    <div key={r.id} className="recipe-card" onClick={() => handlePickRecipe(r)}>
+                      <div className="recipe-emoji" style={{ width: 44, height: 44, fontSize: 24 }}>{r.emoji}</div>
+                      <div className="recipe-info">
+                        <div className="recipe-name">{r.name}</div>
+                        <div className="recipe-meta">🍽️ {r.portions} porciones</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
           {slots[slotPicker.day]?.[slotPicker.mealType] && (
             <button className="btn btn-danger" style={{ width: '100%', marginTop: 16 }} onClick={handleClearSlot}>
               Quitar receta
             </button>
           )}
+          <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={() => setSlotPicker(null)}>
+            Cancelar
+          </button>
         </Modal>
       )}
     </div>
