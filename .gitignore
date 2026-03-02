@@ -27,6 +27,7 @@ nul
 
 # Claude Code local settings
 .claude/settings.local.json
+.mcp.json
 
 # Editor directories and files
 .vscode/*
