@@ -3,11 +3,23 @@ import { supabase } from './supabase'
 import AuthPage from './pages/Auth'
 import UpdatePasswordPage from './pages/UpdatePassword'
 import OnboardingPage from './pages/Onboarding'
+import JoinHouseholdPage from './pages/JoinHousehold'
 import RecipesPage from './pages/Recipes'
 import PlannerPage from './pages/Planner'
 import ShoppingPage from './pages/Shopping'
 import ConfigPage from './pages/Config'
 import BottomNav from './components/layout/BottomNav'
+
+// Detect and consume /join/:code from the URL on first load
+const detectInviteCode = () => {
+  const match = window.location.pathname.match(/^\/join\/([^/]+)$/)
+  if (match) {
+    sessionStorage.setItem('pendingInviteCode', match[1])
+    window.history.replaceState({}, '', '/')
+    return match[1]
+  }
+  return sessionStorage.getItem('pendingInviteCode') || null
+}
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -15,6 +27,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('planner')
   const [recoveryMode, setRecoveryMode] = useState(false)
+  const [inviteCode, setInviteCode] = useState(detectInviteCode)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -48,6 +61,17 @@ export default function App() {
     setLoading(false)
   }
 
+  const handleJoinComplete = (h) => {
+    sessionStorage.removeItem('pendingInviteCode')
+    setInviteCode(null)
+    setHousehold(h)
+  }
+
+  const handleCreateNew = () => {
+    sessionStorage.removeItem('pendingInviteCode')
+    setInviteCode(null)
+  }
+
   if (loading) {
     return (
       <div className="app" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -60,6 +84,19 @@ export default function App() {
   if (!session) return <div className="app"><AuthPage /></div>
 
   if (recoveryMode) return <div className="app"><UpdatePasswordPage onDone={() => setRecoveryMode(false)} /></div>
+
+  if (!household && inviteCode) {
+    return (
+      <div className="app">
+        <JoinHouseholdPage
+          inviteCode={inviteCode}
+          user={session.user}
+          onComplete={handleJoinComplete}
+          onCreateNew={handleCreateNew}
+        />
+      </div>
+    )
+  }
 
   if (!household) {
     return (
