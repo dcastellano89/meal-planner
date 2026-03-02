@@ -14,11 +14,11 @@ import BottomNav from './components/layout/BottomNav'
 const detectInviteCode = () => {
   const match = window.location.pathname.match(/^\/join\/([^/]+)$/)
   if (match) {
-    sessionStorage.setItem('pendingInviteCode', match[1])
+    localStorage.setItem('pendingInviteCode', match[1])
     window.history.replaceState({}, '', '/')
     return match[1]
   }
-  return sessionStorage.getItem('pendingInviteCode') || null
+  return localStorage.getItem('pendingInviteCode') || null
 }
 
 export default function App() {
@@ -62,13 +62,13 @@ export default function App() {
   }
 
   const handleJoinComplete = (h) => {
-    sessionStorage.removeItem('pendingInviteCode')
+    localStorage.removeItem('pendingInviteCode')
     setInviteCode(null)
     setHousehold(h)
   }
 
   const handleCreateNew = () => {
-    sessionStorage.removeItem('pendingInviteCode')
+    localStorage.removeItem('pendingInviteCode')
     setInviteCode(null)
   }
 
