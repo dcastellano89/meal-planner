@@ -9,16 +9,19 @@ import Tag from '../components/ui/Tag'
 import useRecipes from '../hooks/useRecipes'
 
 export default function RecipesPage({ household }) {
-  const { recipes, loading, createRecipe, updateRecipe, deleteRecipe } = useRecipes(household.id)
+  const { recipes, loading, createRecipe, updateRecipe, deleteRecipe, toggleFavorite, ingredientSuggestions } = useRecipes(household.id)
   const [showAdd, setShowAdd] = useState(false)
   const [showEdit, setShowEdit] = useState(null)
   const [showDetail, setShowDetail] = useState(null)
   const [activeCategory, setActiveCategory] = useState('todas')
+  const [activeDifficulty, setActiveDifficulty] = useState('todas')
+  const [onlyFavorites, setOnlyFavorites] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
-  const filtered = activeCategory === 'todas'
-    ? recipes
-    : recipes.filter((r) => r.category === activeCategory)
+  const filtered = recipes
+    .filter((r) => activeCategory === 'todas' || r.category === activeCategory)
+    .filter((r) => activeDifficulty === 'todas' || r.difficulty === activeDifficulty)
+    .filter((r) => !onlyFavorites || r.is_favorite)
 
   const handleDelete = async () => {
     await deleteRecipe(showDetail.id)
@@ -34,11 +37,35 @@ export default function RecipesPage({ household }) {
       />
 
       {recipes.length > 0 && (
-        <CategoryFilter
-          active={activeCategory}
-          onChange={setActiveCategory}
-          recipes={recipes}
-        />
+        <>
+          <CategoryFilter
+            active={activeCategory}
+            onChange={setActiveCategory}
+            recipes={recipes}
+          />
+          <div className="pill-tabs" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            {[
+              { value: 'todas', label: 'Todas' },
+              { value: 'baja',  label: '🟢 Fácil' },
+              { value: 'media', label: '🟡 Media' },
+              { value: 'alta',  label: '🔴 Difícil' },
+            ].map(({ value, label }) => (
+              <button
+                key={value}
+                className={`pill-tab ${activeDifficulty === value ? 'active' : ''}`}
+                onClick={() => setActiveDifficulty(value)}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              className={`pill-tab ${onlyFavorites ? 'active' : ''}`}
+              onClick={() => setOnlyFavorites((v) => !v)}
+            >
+              ★ Favoritas {recipes.filter((r) => r.is_favorite).length > 0 && `(${recipes.filter((r) => r.is_favorite).length})`}
+            </button>
+          </div>
+        </>
       )}
 
       <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -60,7 +87,7 @@ export default function RecipesPage({ household }) {
           />
         ) : (
           filtered.map((r) => (
-            <RecipeCard key={r.id} recipe={r} onClick={() => setShowDetail(r)} />
+            <RecipeCard key={r.id} recipe={r} onClick={() => setShowDetail(r)} onToggleFavorite={toggleFavorite} />
           ))
         )}
       </div>
@@ -71,6 +98,7 @@ export default function RecipesPage({ household }) {
         <RecipeForm
           onSave={createRecipe}
           onClose={() => setShowAdd(false)}
+          suggestions={ingredientSuggestions}
         />
       )}
 
@@ -79,6 +107,7 @@ export default function RecipesPage({ household }) {
           initialData={showEdit}
           onSave={(data) => updateRecipe(showEdit.id, data)}
           onClose={() => { setShowEdit(null); setShowDetail(null) }}
+          suggestions={ingredientSuggestions}
         />
       )}
 
@@ -139,12 +168,17 @@ export default function RecipesPage({ household }) {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-              <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowEdit(showDetail)}>
-                Editar
-              </button>
-              <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => setDeleteConfirm(true)}>
-                Eliminar
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20 }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowEdit(showDetail)}>
+                  Editar
+                </button>
+                <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => setDeleteConfirm(true)}>
+                  Eliminar
+                </button>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setShowDetail(null)}>
+                Cerrar
               </button>
             </div>
           )}

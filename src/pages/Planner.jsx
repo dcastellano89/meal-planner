@@ -8,24 +8,33 @@ import { generateWeeklyMenu } from '../services/menuPlanner'
 import { formatWeekRange } from '../utils/portions'
 import { CATEGORIES } from '../components/recipe/CategoryFilter'
 
-const DAYS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom']
-const DAYS_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+const ALL_DAYS_FULL = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado', dom: 'Domingo' }
+const DEFAULT_ACTIVE_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie']
 
 export default function PlannerPage({ household }) {
+  const activeDays = household.active_days || DEFAULT_ACTIVE_DAYS
   const { recipes } = useRecipes(household.id)
-  const { slots, loading, hasAnySlot, stats, weekStart, updateSlot, applyGeneratedPlan, clearPlan } = usePlanner(household.id)
+  const { slots, loading, hasAnySlot, stats, weekStart, updateSlot, applyGeneratedPlan, clearPlan } = usePlanner(household.id, activeDays)
 
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState('')
   const [slotPicker, setSlotPicker] = useState(null)
   const [pickerCategory, setPickerCategory] = useState('todas')
+  const [showSurvey, setShowSurvey] = useState(false)
+  const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix' })
 
-  const handleGenerate = async () => {
+  const openSurvey = () => {
     if (recipes.length < 1) return
+    setSurvey({ fridge: '', specific: '', difficulty: 'mix' })
+    setShowSurvey(true)
+  }
+
+  const handleGenerate = async (preferences = null) => {
+    setShowSurvey(false)
     setGenerating(true)
     setGenerateError('')
     try {
-      const generated = await generateWeeklyMenu({ recipes, persons: household.persons || 2 })
+      const generated = await generateWeeklyMenu({ recipes, persons: household.persons || 2, activeDays, preferences })
       await applyGeneratedPlan(generated, recipes)
     } catch (e) {
       setGenerateError('No se pudo generar el menú. Intentá de nuevo.')
@@ -112,7 +121,7 @@ export default function PlannerPage({ household }) {
               )}
               <button
                 className="btn"
-                onClick={handleGenerate}
+                onClick={openSurvey}
                 disabled={generating}
                 style={{ background: 'white', color: '#2D5016', padding: '14px 24px', fontSize: 15, width: '100%', fontWeight: 700, borderRadius: 12 }}
               >
@@ -123,7 +132,7 @@ export default function PlannerPage({ household }) {
           <div style={{ textAlign: 'center', marginTop: 16 }}>
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => openSlotPicker('lun', 'lunch')}
+              onClick={() => openSlotPicker(activeDays[0], 'lunch')}
             >
               Armar manualmente
             </button>
@@ -141,9 +150,9 @@ export default function PlannerPage({ household }) {
 
           <div className="section-pad">
             <div className="week-grid">
-              {DAYS.map((day, i) => (
+              {activeDays.map((day) => (
                 <div key={day} className="day-row">
-                  <div className="day-header">{DAYS_FULL[i]}</div>
+                  <div className="day-header">{ALL_DAYS_FULL[day]}</div>
                   <div className="meal-slots">
                     {['lunch', 'dinner'].map((mealType) => {
                       const recipe = slots[day]?.[mealType]
@@ -171,18 +180,87 @@ export default function PlannerPage({ household }) {
             <p style={{ textAlign: 'center', fontSize: 13, color: '#DC2626', padding: '0 20px 8px' }}>{generateError}</p>
           )}
           <div style={{ padding: '8px 20px 16px' }}>
-            <button className="btn btn-ghost" style={{ width: '100%' }} onClick={handleGenerate} disabled={generating}>
+            <button className="btn btn-ghost" style={{ width: '100%' }} onClick={openSurvey} disabled={generating}>
               {generating ? '✨ Generando...' : '✨ Regenerar menú'}
             </button>
           </div>
         </>
       )}
 
+      {/* Modal encuesta antes de generar */}
+      {showSurvey && (
+        <Modal onClose={() => setShowSurvey(false)} title="¿Cómo querés planificar esta semana?">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 8 }}>
+                ¿Qué tenés en la heladera?
+              </label>
+              <input
+                className="input-field"
+                placeholder="Ej: pollo, zapallo, huevos..."
+                value={survey.fridge}
+                onChange={(e) => setSurvey((s) => ({ ...s, fridge: e.target.value }))}
+              />
+              <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>La IA priorizará recetas con esos ingredientes.</p>
+            </div>
+
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 8 }}>
+                ¿Querés incluir alguna receta o tipo de comida?
+              </label>
+              <input
+                className="input-field"
+                placeholder="Ej: las lentejas, algo con pasta..."
+                value={survey.specific}
+                onChange={(e) => setSurvey((s) => ({ ...s, specific: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 8 }}>
+                ¿Qué dificultad querés esta semana?
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[
+                  { value: 'baja', label: '🟢 Fácil' },
+                  { value: 'mix',  label: '🟡 Mix' },
+                  { value: 'alta', label: '🔴 Elaborado' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setSurvey((s) => ({ ...s, difficulty: value }))}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      border: `2px solid ${survey.difficulty === value ? '#2D5016' : '#E8EDE0'}`,
+                      background: survey.difficulty === value ? '#E8F5D0' : 'white',
+                      color: survey.difficulty === value ? '#2D5016' : '#6B7280',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="btn btn-primary" onClick={() => handleGenerate(survey)}>
+              ✨ Generar menú
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: -8 }} onClick={() => handleGenerate(null)}>
+              Saltar y generar sin preferencias
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{ marginTop: -8 }} onClick={() => setShowSurvey(false)}>
+              Cancelar
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {/* Slot Picker Modal */}
       {slotPicker && (
         <Modal
           onClose={() => setSlotPicker(null)}
-          title={`${DAYS_FULL[DAYS.indexOf(slotPicker.day)]} — ${slotPicker.mealType === 'lunch' ? 'Almuerzo' : 'Cena'}`}
+          title={`${ALL_DAYS_FULL[slotPicker.day]} — ${slotPicker.mealType === 'lunch' ? 'Almuerzo' : 'Cena'}`}
         >
           {recipes.length === 0 ? (
             <p style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '24px 0' }}>

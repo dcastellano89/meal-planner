@@ -23,10 +23,10 @@ export default function useRecipes(householdId) {
     if (householdId) fetchRecipes()
   }, [fetchRecipes, householdId])
 
-  const createRecipe = async ({ name, portions, emoji, category, tags, ingredients, procedure }) => {
+  const createRecipe = async ({ name, portions, emoji, category, tags, ingredients, procedure, difficulty }) => {
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
-      .insert({ household_id: householdId, name, portions, emoji, category, tags, procedure: procedure || null })
+      .insert({ household_id: householdId, name, portions, emoji, category, tags, procedure: procedure || null, difficulty: difficulty || 'media' })
       .select()
       .single()
 
@@ -49,10 +49,10 @@ export default function useRecipes(householdId) {
     return recipe
   }
 
-  const updateRecipe = async (id, { name, portions, emoji, category, tags, ingredients, procedure }) => {
+  const updateRecipe = async (id, { name, portions, emoji, category, tags, ingredients, procedure, difficulty }) => {
     const { error: recipeError } = await supabase
       .from('recipes')
-      .update({ name, portions, emoji, category, tags, procedure: procedure || null })
+      .update({ name, portions, emoji, category, tags, procedure: procedure || null, difficulty: difficulty || 'media' })
       .eq('id', id)
 
     if (recipeError) throw recipeError
@@ -82,5 +82,15 @@ export default function useRecipes(householdId) {
     setRecipes((prev) => prev.filter((r) => r.id !== id))
   }
 
-  return { recipes, loading, error, createRecipe, updateRecipe, deleteRecipe, refetch: fetchRecipes }
+  const toggleFavorite = async (id, current) => {
+    const { error } = await supabase.from('recipes').update({ is_favorite: !current }).eq('id', id)
+    if (error) throw error
+    setRecipes((prev) => prev.map((r) => r.id === id ? { ...r, is_favorite: !current } : r))
+  }
+
+  const ingredientSuggestions = [...new Set(
+    recipes.flatMap((r) => (r.ingredients || []).map((i) => i.name.trim()).filter(Boolean))
+  )].sort()
+
+  return { recipes, loading, error, createRecipe, updateRecipe, deleteRecipe, toggleFavorite, ingredientSuggestions, refetch: fetchRecipes }
 }

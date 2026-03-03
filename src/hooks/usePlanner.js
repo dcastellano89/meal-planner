@@ -2,15 +2,16 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabase'
 import { getWeekStart } from '../utils/portions'
 
-const DAYS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom']
+const ALL_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom']
+const DEFAULT_ACTIVE_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie']
 
 const emptySlots = () => {
   const s = {}
-  DAYS.forEach((d) => { s[d] = { lunch: null, dinner: null } })
+  ALL_DAYS.forEach((d) => { s[d] = { lunch: null, dinner: null } })
   return s
 }
 
-export default function usePlanner(householdId) {
+export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS) {
   const [planId, setPlanId] = useState(null)
   const [slots, setSlots] = useState(emptySlots())
   const [loading, setLoading] = useState(true)
@@ -103,9 +104,9 @@ export default function usePlanner(householdId) {
     // Borrar slots actuales
     await supabase.from('plan_slots').delete().eq('plan_id', planId)
 
-    // Insertar los nuevos
+    // Insertar los nuevos (solo días activos)
     const rows = []
-    DAYS.forEach((day) => {
+    activeDays.forEach((day) => {
       ;['lunch', 'dinner'].forEach((mealType) => {
         const recipeId = generatedPlan[day]?.[mealType]
         if (recipeId) {
@@ -129,12 +130,14 @@ export default function usePlanner(householdId) {
 
   const hasAnySlot = Object.values(slots).some((d) => d.lunch || d.dinner)
 
+  const activeSlots = activeDays.map((d) => slots[d] || { lunch: null, dinner: null })
+  const planned = activeSlots.reduce((acc, d) => acc + (d.lunch ? 1 : 0) + (d.dinner ? 1 : 0), 0)
   const stats = {
-    planned: Object.values(slots).reduce((acc, d) => acc + (d.lunch ? 1 : 0) + (d.dinner ? 1 : 0), 0),
-    empty: 14 - Object.values(slots).reduce((acc, d) => acc + (d.lunch ? 1 : 0) + (d.dinner ? 1 : 0), 0),
+    planned,
+    empty: activeDays.length * 2 - planned,
     recipes: new Set([
-      ...Object.values(slots).map((d) => d.lunch?.id),
-      ...Object.values(slots).map((d) => d.dinner?.id),
+      ...activeSlots.map((d) => d.lunch?.id),
+      ...activeSlots.map((d) => d.dinner?.id),
     ].filter(Boolean)).size,
   }
 

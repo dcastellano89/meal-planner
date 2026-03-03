@@ -5,22 +5,30 @@ import { CATEGORIES } from './CategoryFilter'
 
 const EMOJIS = ['🍗', '🍝', '🥩', '🥚', '🫘', '🥗', '🍲', '🥘', '🌮', '🍛', '🥙', '🍜', '🥧', '🐟', '🍚']
 
+const DIFFICULTY_OPTIONS = [
+  { value: 'baja', label: '🟢 Fácil' },
+  { value: 'media', label: '🟡 Media' },
+  { value: 'alta', label: '🔴 Difícil' },
+]
+
 const EMPTY_FORM = {
   name: '',
   portions: 2,
   emoji: '🍴',
   category: 'otros',
+  difficulty: 'media',
   tags: '',
   ingredients: [{ name: '', quantity: '' }],
   procedure: '',
 }
 
-export default function RecipeForm({ onSave, onClose, initialData = null }) {
+export default function RecipeForm({ onSave, onClose, initialData = null, suggestions = [] }) {
   const [addTab, setAddTab] = useState('manual')
   const [form, setForm] = useState(
     initialData
       ? {
           ...initialData,
+          difficulty: initialData.difficulty || 'media',
           tags: (initialData.tags || []).join(', '),
           ingredients: initialData.ingredients?.length
             ? initialData.ingredients.map((i) => ({ name: i.name, quantity: i.quantity }))
@@ -57,6 +65,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
         portions: form.portions,
         emoji: form.emoji,
         category: form.category,
+        difficulty: form.difficulty,
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
         ingredients: form.ingredients.filter((i) => i.name.trim()),
         procedure: form.procedure.trim() || null,
@@ -74,6 +83,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
       portions: data.portions || 2,
       emoji: data.emoji || '🍴',
       category: data.category || 'otros',
+      difficulty: data.difficulty || 'media',
       tags: (data.tags || []).join(', '),
       ingredients: data.ingredients?.length
         ? data.ingredients.map((i) => ({ name: i.name, quantity: i.quantity }))
@@ -199,6 +209,26 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
           </div>
 
           <div className="input-group">
+            <label className="input-label">Dificultad</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {DIFFICULTY_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  onClick={() => setForm((f) => ({ ...f, difficulty: value }))}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    border: `2px solid ${form.difficulty === value ? '#2D5016' : '#E8EDE0'}`,
+                    background: form.difficulty === value ? '#E8F5D0' : 'white',
+                    color: form.difficulty === value ? '#2D5016' : '#6B7280',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="input-group">
             <label className="input-label">Tags (separados por coma)</label>
             <input
               className="input-field"
@@ -210,6 +240,11 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
 
           <div className="input-group">
             <label className="input-label">Ingredientes *</label>
+            {suggestions.length > 0 && (
+              <datalist id="ingredient-suggestions">
+                {suggestions.map((s) => <option key={s} value={s} />)}
+              </datalist>
+            )}
             {form.ingredients.map((ing, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <input
@@ -217,11 +252,12 @@ export default function RecipeForm({ onSave, onClose, initialData = null }) {
                   placeholder="Ingrediente"
                   value={ing.name}
                   onChange={(e) => updateIng(i, 'name', e.target.value)}
+                  list={suggestions.length > 0 ? 'ingredient-suggestions' : undefined}
                   style={{ flex: 2 }}
                 />
                 <input
                   className="input-field"
-                  placeholder="Cantidad"
+                  placeholder="Cantidad (opcional)"
                   value={ing.quantity}
                   onChange={(e) => updateIng(i, 'quantity', e.target.value)}
                   style={{ flex: 1 }}

@@ -3,8 +3,13 @@ import { supabase, signOut } from '../supabase'
 import Header from '../components/layout/Header'
 import Modal from '../components/ui/Modal'
 
+const ALL_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom']
+const ALL_DAYS_LABEL = { lun: 'Lun', mar: 'Mar', mie: 'Mié', jue: 'Jue', vie: 'Vie', sab: 'Sáb', dom: 'Dom' }
+const DEFAULT_ACTIVE_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie']
+
 export default function ConfigPage({ household, setHousehold, user }) {
   const [persons, setPersons] = useState(household.persons || 2)
+  const [activeDays, setActiveDays] = useState(household.active_days || DEFAULT_ACTIVE_DAYS)
   const [saving, setSaving] = useState(false)
   const [showInvite, setShowInvite] = useState(false)
   const [members, setMembers] = useState([])
@@ -21,6 +26,17 @@ export default function ConfigPage({ household, setHousehold, user }) {
     }
     fetchMembers()
   }, [household.id])
+
+  const toggleDay = async (day) => {
+    const isActive = activeDays.includes(day)
+    if (isActive && activeDays.length === 1) return // mínimo 1 día
+    const newDays = isActive ? activeDays.filter((d) => d !== day) : [...activeDays, day]
+    // Mantener el orden de la semana
+    const ordered = ALL_DAYS.filter((d) => newDays.includes(d))
+    setActiveDays(ordered)
+    await supabase.from('households').update({ active_days: ordered }).eq('id', household.id)
+    setHousehold((h) => ({ ...h, active_days: ordered }))
+  }
 
   const updatePersons = async (n) => {
     setPersons(n)
@@ -98,6 +114,40 @@ export default function ConfigPage({ household, setHousehold, user }) {
             </div>
             <p style={{ fontSize: 12, color: '#6B7280', marginTop: 10 }}>
               {saving ? 'Guardando...' : persons === 1 ? '1 persona — las porciones son para vos sola.' : `${persons} personas — las porciones se dividen entre ${persons}.`}
+            </p>
+          </div>
+        </div>
+
+        {/* Días activos */}
+        <div className="card">
+          <div className="card-pad">
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+              Días de planificación
+            </div>
+            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 14, lineHeight: 1.5 }}>
+              El planificador y la IA solo usarán los días seleccionados.
+            </p>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {ALL_DAYS.map((day) => {
+                const active = activeDays.includes(day)
+                return (
+                  <button
+                    key={day}
+                    onClick={() => toggleDay(day)}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: `2px solid ${active ? '#2D5016' : '#E8EDE0'}`,
+                      background: active ? '#E8F5D0' : 'white',
+                      color: active ? '#2D5016' : '#9CA3AF',
+                    }}
+                  >
+                    {ALL_DAYS_LABEL[day]}
+                  </button>
+                )
+              })}
+            </div>
+            <p style={{ fontSize: 12, color: '#6B7280', marginTop: 10 }}>
+              {activeDays.length} {activeDays.length === 1 ? 'día seleccionado' : 'días seleccionados'}
             </p>
           </div>
         </div>

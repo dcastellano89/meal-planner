@@ -36,12 +36,14 @@ El JSON debe tener exactamente esta estructura:
   "ingredients": [
     { "name": "nombre del ingrediente", "quantity": "cantidad y unidad" }
   ],
+  "difficulty": "baja|media|alta",
   "procedure": "pasos para preparar la receta"
 }
 Si no podés identificar algún campo, usá valores razonables por defecto.
 Para portions, estimá según la cantidad de ingredientes.
 Para category, elegí la más apropiada según los ingredientes principales.
 Para emoji, elegí uno que represente bien el plato.
+Para difficulty: baja = menos de 5 ingredientes y preparación simple (menos de 30 min); media = 5-8 ingredientes o técnica moderada (30-60 min); alta = más de 8 ingredientes o técnica compleja (más de 60 min).
 Para procedure: si la imagen contiene los pasos de preparación, extraelos. Si no están en la imagen, generá un procedimiento detallado y razonable basado en el nombre y los ingredientes identificados. Siempre incluí el procedimiento.`,
     messages: [
       {

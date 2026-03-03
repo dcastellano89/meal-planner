@@ -28,9 +28,66 @@ export const SHOPPING_CATEGORIES = {
 }
 
 /**
+ * Parsea un string de cantidad en { amount, unit }.
+ * Ejemplos:
+ *   "3 tomates"  → { amount: 3,   unit: "tomates" }
+ *   "200g"       → { amount: 200, unit: "g" }
+ *   "1/2 kg"     → { amount: 0.5, unit: "kg" }
+ *   "al gusto"   → { amount: null, unit: "al gusto" }
+ */
+const parseQuantity = (qty) => {
+  if (!qty || !qty.trim()) return { amount: null, unit: '' }
+  const str = qty.trim()
+  const numMatch = str.match(/^(\d+(?:[.,]\d+)?(?:\/\d+)?)\s*(.*)$/)
+  if (!numMatch) return { amount: null, unit: str.toLowerCase().trim() }
+  const rawNum = numMatch[1]
+  const unit = numMatch[2].trim().toLowerCase()
+  let amount
+  if (rawNum.includes('/')) {
+    const [n, d] = rawNum.split('/')
+    amount = parseFloat(n) / parseFloat(d)
+  } else {
+    amount = parseFloat(rawNum.replace(',', '.'))
+  }
+  return { amount: isNaN(amount) ? null : amount, unit }
+}
+
+/**
+ * Consolida ingredientes con el mismo nombre e igual unidad sumando las cantidades.
+ * Ingredientes con distinta unidad quedan como ítems separados.
+ */
+const consolidateIngredients = (ingredients) => {
+  const map = {}
+  const order = []
+
+  ingredients.forEach(({ name, quantity }) => {
+    const { amount, unit } = parseQuantity(quantity)
+    const key = `${name.toLowerCase().trim()}__${unit}`
+
+    if (map[key] && amount !== null && map[key].amount !== null) {
+      map[key].amount += amount
+    } else if (!map[key]) {
+      map[key] = { name, amount, unit }
+      order.push(key)
+    }
+  })
+
+  return order.map((key) => {
+    const { name, amount, unit } = map[key]
+    let quantityStr
+    if (amount === null) {
+      quantityStr = unit || ''
+    } else {
+      const amountStr = amount % 1 === 0 ? String(Math.round(amount)) : amount.toFixed(1)
+      quantityStr = unit ? `${amountStr} ${unit}` : amountStr
+    }
+    return { name, quantity: quantityStr }
+  })
+}
+
+/**
  * Construye la lista de compras a partir de los slots del plan.
- * Deduplica recetas: si una receta aparece N veces en la semana,
- * sus ingredientes se cuentan UNA sola vez.
+ * Deduplica recetas y consolida ingredientes con mismo nombre y unidad.
  */
 export const buildShoppingList = (planSlots, recipes) => {
   // IDs únicos de recetas usadas en el plan
@@ -47,8 +104,8 @@ export const buildShoppingList = (planSlots, recipes) => {
     }))
   })
 
-  // Agrupar por categoría
-  return groupByCategory(allIngredients)
+  // Consolidar y agrupar por categoría
+  return groupByCategory(consolidateIngredients(allIngredients))
 }
 
 const groupByCategory = (ingredients) => {
