@@ -53,7 +53,7 @@ export default function UpdatePasswordPage({ onDone }) {
   return (
     <div className="auth-screen">
       <div style={{ marginBottom: 32 }}>
-        <div className="onboard-logo">🍽️ Meal Planner</div>
+        <div className="onboard-logo">🍽️ Hoy toca</div>
       </div>
 
       <div style={{ marginBottom: 24 }}>

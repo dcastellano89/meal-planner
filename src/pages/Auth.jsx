@@ -97,8 +97,8 @@ export default function AuthPage() {
   return (
     <div className="auth-screen">
       <div style={{ marginBottom: 40 }}>
-        <div className="onboard-logo">🍽️ Meal Planner</div>
-        <div className="onboard-tagline">Planificá tus comidas semanales en familia</div>
+        <div className="onboard-logo">🍽️ Hoy toca</div>
+        <div className="onboard-tagline">Hoy toca... comer sin pensar</div>
       </div>
 
       {mode !== 'reset' && (
