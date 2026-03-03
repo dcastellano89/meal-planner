@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
+import { seedSampleRecipes } from '../utils/sampleRecipes'
 
 export default function OnboardingPage({ user, onComplete }) {
   const [step, setStep] = useState(0)
@@ -26,6 +27,7 @@ export default function OnboardingPage({ user, onComplete }) {
     }
 
     setHousehold(data)
+    await seedSampleRecipes(data.id)
     setLoading(false)
     setStep(2)
   }

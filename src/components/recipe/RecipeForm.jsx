@@ -17,7 +17,7 @@ const EMPTY_FORM = {
   emoji: '🍴',
   category: 'otros',
   difficulty: 'media',
-  tags: '',
+  tags: [],
   ingredients: [{ name: '', quantity: '' }],
   procedure: '',
 }
@@ -29,7 +29,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
       ? {
           ...initialData,
           difficulty: initialData.difficulty || 'media',
-          tags: (initialData.tags || []).join(', '),
+          tags: initialData.tags || [],
           ingredients: initialData.ingredients?.length
             ? initialData.ingredients.map((i) => ({ name: i.name, quantity: i.quantity }))
             : [{ name: '', quantity: '' }],
@@ -37,6 +37,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
         }
       : EMPTY_FORM
   )
+  const [tagInput, setTagInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [imageError, setImageError] = useState('')
@@ -66,7 +67,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
         emoji: form.emoji,
         category: form.category,
         difficulty: form.difficulty,
-        tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
+        tags: form.tags,
         ingredients: form.ingredients.filter((i) => i.name.trim()),
         procedure: form.procedure.trim() || null,
       })
@@ -84,7 +85,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
       emoji: data.emoji || '🍴',
       category: data.category || 'otros',
       difficulty: data.difficulty || 'media',
-      tags: (data.tags || []).join(', '),
+      tags: data.tags || [],
       ingredients: data.ingredients?.length
         ? data.ingredients.map((i) => ({ name: i.name, quantity: i.quantity }))
         : [{ name: '', quantity: '' }],
@@ -229,12 +230,34 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
           </div>
 
           <div className="input-group">
-            <label className="input-label">Tags (separados por coma)</label>
+            <label className="input-label">Tags</label>
+            {form.tags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {form.tags.map((t) => (
+                  <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#E8F5D0', color: '#2D5016', fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 20 }}>
+                    {t}
+                    <button
+                      onClick={() => setForm((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))}
+                      style={{ background: 'none', border: 'none', color: '#2D5016', fontSize: 14, cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.7 }}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            )}
             <input
               className="input-field"
-              placeholder="rápido, vegetariano, con pollo..."
-              value={form.tags}
-              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+              placeholder="Escribí un tag y presioná Enter..."
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ',') && tagInput.trim()) {
+                  e.preventDefault()
+                  const newTag = tagInput.trim().replace(/,$/, '')
+                  if (newTag && !form.tags.includes(newTag))
+                    setForm((f) => ({ ...f, tags: [...f.tags, newTag] }))
+                  setTagInput('')
+                }
+              }}
             />
           </div>
 
