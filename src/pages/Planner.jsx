@@ -20,6 +20,7 @@ export default function PlannerPage({ household }) {
   const [generateError, setGenerateError] = useState('')
   const [slotPicker, setSlotPicker] = useState(null)
   const [pickerCategory, setPickerCategory] = useState('todas')
+  const [pickerOnlyFavorites, setPickerOnlyFavorites] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
   const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix' })
 
@@ -44,6 +45,7 @@ export default function PlannerPage({ household }) {
 
   const openSlotPicker = (day, mealType) => {
     setPickerCategory('todas')
+    setPickerOnlyFavorites(false)
     setSlotPicker({ day, mealType })
   }
 
@@ -268,10 +270,12 @@ export default function PlannerPage({ household }) {
             </p>
           ) : (() => {
             const visibleCats = CATEGORIES.filter((c) => c.id === 'todas' || recipes.some((r) => r.category === c.id))
-            const filtered = pickerCategory === 'todas' ? recipes : recipes.filter((r) => r.category === pickerCategory)
+            const filtered = recipes
+              .filter((r) => pickerCategory === 'todas' || r.category === pickerCategory)
+              .filter((r) => !pickerOnlyFavorites || r.is_favorite)
             return (
               <>
-                <div className="pill-tabs" style={{ marginBottom: 12 }}>
+                <div className="pill-tabs" style={{ marginBottom: 4 }}>
                   {visibleCats.map((cat) => (
                     <button
                       key={cat.id}
@@ -281,6 +285,14 @@ export default function PlannerPage({ household }) {
                       {cat.label}
                     </button>
                   ))}
+                </div>
+                <div className="pill-tabs" style={{ marginBottom: 12 }}>
+                  <button
+                    className={`pill-tab ${pickerOnlyFavorites ? 'active' : ''}`}
+                    onClick={() => setPickerOnlyFavorites((v) => !v)}
+                  >
+                    ★ Favoritas
+                  </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {filtered.map((r) => (

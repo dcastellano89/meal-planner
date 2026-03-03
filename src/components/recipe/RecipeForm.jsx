@@ -289,6 +289,9 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
           <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
             {loading ? 'Guardando...' : 'Guardar receta'}
           </button>
+          <button className="btn btn-ghost" onClick={onClose} disabled={loading} style={{ marginTop: 8 }}>
+            Cancelar
+          </button>
         </>
       )}
     </Modal>

@@ -6,6 +6,7 @@ import { buildShoppingList } from '../utils/shopping'
 export default function useShopping(householdId) {
   const [planId, setPlanId] = useState(null)
   const [shoppingList, setShoppingList] = useState({})
+  const [extras, setExtras] = useState([])
   const [loading, setLoading] = useState(true)
 
   const weekStart = getWeekStart()
@@ -13,7 +14,6 @@ export default function useShopping(householdId) {
   const fetchShopping = useCallback(async () => {
     setLoading(true)
 
-    // Buscar el plan de esta semana
     const { data: plan } = await supabase
       .from('weekly_plans')
       .select('id')
@@ -24,13 +24,14 @@ export default function useShopping(householdId) {
     if (!plan) {
       setPlanId(null)
       setShoppingList({})
+      setExtras([])
       setLoading(false)
       return
     }
 
     setPlanId(plan.id)
 
-    // Obtener slots del plan
+    // Slots del plan
     const { data: slots } = await supabase
       .from('plan_slots')
       .select('recipe_id')
@@ -38,33 +39,26 @@ export default function useShopping(householdId) {
 
     const recipeIds = [...new Set((slots || []).map((s) => s.recipe_id).filter(Boolean))]
 
-    if (recipeIds.length === 0) {
-      setShoppingList({})
-      setLoading(false)
-      return
-    }
+    // Recetas con ingredientes
+    const recipes = recipeIds.length > 0
+      ? (await supabase.from('recipes').select('id, ingredients(name, quantity, sort_order)').in('id', recipeIds)).data || []
+      : []
 
-    // Obtener recetas con ingredientes
-    const { data: recipes } = await supabase
-      .from('recipes')
-      .select('id, ingredients(name, quantity, sort_order)')
-      .in('id', recipeIds)
+    // Lista de compras de recetas
+    const list = buildShoppingList(slots || [], recipes)
 
-    // Construir lista de compras (deduplicada)
-    const list = buildShoppingList(slots || [], recipes || [])
-
-    // Cargar estados de tildado
+    // Estados de tildado (solo ítems de recetas)
     const { data: checkedItems } = await supabase
       .from('shopping_items')
       .select('ingredient_name, checked')
       .eq('plan_id', plan.id)
+      .eq('is_manual', false)
 
     const checkedMap = {}
     ;(checkedItems || []).forEach((item) => {
       checkedMap[item.ingredient_name.toLowerCase()] = item.checked
     })
 
-    // Combinar lista con estado de tildado
     const merged = {}
     Object.entries(list).forEach(([cat, items]) => {
       merged[cat] = items.map((item) => ({
@@ -72,8 +66,22 @@ export default function useShopping(householdId) {
         checked: checkedMap[item.name.toLowerCase()] ?? false,
       }))
     })
-
     setShoppingList(merged)
+
+    // Extras manuales
+    const { data: extraItems } = await supabase
+      .from('shopping_items')
+      .select('ingredient_name, quantity, checked')
+      .eq('plan_id', plan.id)
+      .eq('is_manual', true)
+      .order('ingredient_name')
+
+    setExtras((extraItems || []).map((e) => ({
+      name: e.ingredient_name,
+      quantity: e.quantity || '',
+      checked: e.checked,
+    })))
+
     setLoading(false)
   }, [householdId, weekStart])
 
@@ -81,7 +89,7 @@ export default function useShopping(householdId) {
     if (householdId) fetchShopping()
   }, [fetchShopping, householdId])
 
-  // Realtime: sincronizar con otros miembros del hogar
+  // Realtime
   useEffect(() => {
     if (!planId) return
     const channel = supabase
@@ -98,8 +106,6 @@ export default function useShopping(householdId) {
 
   const toggleItem = async (item, category, currentChecked) => {
     if (!planId) return
-
-    // Actualización optimista
     setShoppingList((prev) => {
       const updated = {}
       Object.entries(prev).forEach(([cat, items]) => {
@@ -109,23 +115,43 @@ export default function useShopping(householdId) {
       })
       return updated
     })
-
     await supabase.from('shopping_items').upsert(
-      {
-        plan_id: planId,
-        ingredient_name: item.name,
-        quantity: item.quantity || '',
-        category,
-        checked: !currentChecked,
-      },
-      { onConflict: 'plan_id,ingredient_name' }
+      { plan_id: planId, ingredient_name: item.name, quantity: item.quantity || '', category, checked: !currentChecked, is_manual: false },
+      { onConflict: 'plan_id,ingredient_name,is_manual' }
     )
+  }
+
+  const addExtra = async (name, quantity = '') => {
+    if (!planId || !name.trim()) return
+    const trimmed = name.trim()
+    if (extras.some((e) => e.name.toLowerCase() === trimmed.toLowerCase())) return
+    setExtras((prev) => [...prev, { name: trimmed, quantity, checked: false }])
+    await supabase.from('shopping_items').upsert(
+      { plan_id: planId, ingredient_name: trimmed, quantity, category: 'extras', checked: false, is_manual: true },
+      { onConflict: 'plan_id,ingredient_name,is_manual' }
+    )
+  }
+
+  const removeExtra = async (name) => {
+    if (!planId) return
+    setExtras((prev) => prev.filter((e) => e.name !== name))
+    await supabase.from('shopping_items').delete()
+      .eq('plan_id', planId)
+      .eq('ingredient_name', name)
+      .eq('is_manual', true)
+  }
+
+  const toggleExtra = async (name, currentChecked) => {
+    if (!planId) return
+    setExtras((prev) => prev.map((e) => e.name === name ? { ...e, checked: !currentChecked } : e))
+    await supabase.from('shopping_items').update({ checked: !currentChecked })
+      .eq('plan_id', planId)
+      .eq('ingredient_name', name)
+      .eq('is_manual', true)
   }
 
   const clearChecked = async () => {
     if (!planId) return
-
-    // Optimistic
     setShoppingList((prev) => {
       const updated = {}
       Object.entries(prev).forEach(([cat, items]) => {
@@ -133,25 +159,29 @@ export default function useShopping(householdId) {
       })
       return updated
     })
-
-    await supabase
-      .from('shopping_items')
-      .delete()
-      .eq('plan_id', planId)
+    setExtras((prev) => prev.map((e) => ({ ...e, checked: false })))
+    // Borrar check states de recetas
+    await supabase.from('shopping_items').delete().eq('plan_id', planId).eq('is_manual', false)
+    // Desmarcar extras (sin borrarlos)
+    await supabase.from('shopping_items').update({ checked: false }).eq('plan_id', planId).eq('is_manual', true)
   }
 
-  const totalItems = Object.values(shoppingList).reduce((acc, items) => acc + items.length, 0)
+  const totalItems = Object.values(shoppingList).reduce((acc, items) => acc + items.length, 0) + extras.length
   const checkedCount = Object.values(shoppingList).reduce(
     (acc, items) => acc + items.filter((i) => i.checked).length, 0
-  )
+  ) + extras.filter((e) => e.checked).length
 
   return {
     shoppingList,
+    extras,
     loading,
     hasPlan: planId !== null,
     totalItems,
     checkedCount,
     toggleItem,
+    addExtra,
+    removeExtra,
+    toggleExtra,
     clearChecked,
     refresh: fetchShopping,
   }

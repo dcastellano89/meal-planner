@@ -1,13 +1,21 @@
+import { useState } from 'react'
 import Header from '../components/layout/Header'
 import EmptyState from '../components/ui/EmptyState'
 import useShopping from '../hooks/useShopping'
 import { CATEGORY_LABELS } from '../utils/shopping'
 
 export default function ShoppingPage({ household }) {
-  const { shoppingList, loading, hasPlan, totalItems, checkedCount, toggleItem, clearChecked } =
+  const { shoppingList, extras, loading, hasPlan, totalItems, checkedCount, toggleItem, addExtra, removeExtra, toggleExtra, clearChecked } =
     useShopping(household.id)
+  const [extraInput, setExtraInput] = useState('')
 
   const hasItems = totalItems > 0
+
+  const handleAddExtra = () => {
+    if (!extraInput.trim()) return
+    addExtra(extraInput.trim())
+    setExtraInput('')
+  }
 
   if (loading) {
     return (
@@ -147,9 +155,11 @@ export default function ShoppingPage({ household }) {
               )
 
               const allEntries = Object.entries(shoppingList)
-              const checkedItems = allEntries.flatMap(([cat, items]) =>
-                items.filter((i) => i.checked).map((i) => ({ item: i, cat }))
+              const checkedRecipeItems = allEntries.flatMap(([cat, items]) =>
+                items.filter((i) => i.checked).map((i) => ({ item: i, cat, isExtra: false }))
               )
+              const checkedExtraItems = extras.filter((e) => e.checked).map((e) => ({ item: e, cat: 'extras', isExtra: true }))
+              const allChecked = [...checkedRecipeItems, ...checkedExtraItems]
 
               return (
                 <>
@@ -165,11 +175,63 @@ export default function ShoppingPage({ household }) {
                     )
                   })}
 
+                  {/* Extras manuales pendientes */}
+                  <div style={{ marginBottom: 20 }}>
+                    {categoryHeader('🛒 Extras')}
+                    {extras.filter((e) => !e.checked).map((e) => (
+                      <div
+                        key={e.name}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #F3F4F6' }}
+                      >
+                        <div
+                          onClick={() => toggleExtra(e.name, e.checked)}
+                          style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid #D1D5DB', background: 'white', flexShrink: 0, cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'baseline', gap: 6, cursor: 'pointer' }} onClick={() => toggleExtra(e.name, e.checked)}>
+                          <span style={{ fontSize: 15, color: '#111827', fontWeight: 500 }}>{e.name}</span>
+                          {e.quantity && <span style={{ fontSize: 12, color: '#9CA3AF' }}>{e.quantity}</span>}
+                        </div>
+                        <button
+                          onClick={() => removeExtra(e.name)}
+                          style={{ background: 'none', border: 'none', color: '#9CA3AF', fontSize: 18, cursor: 'pointer', padding: '0 4px', lineHeight: 1 }}
+                        >×</button>
+                      </div>
+                    ))}
+                    {/* Input agregar extra */}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      <input
+                        className="input-field"
+                        placeholder="Agregar ítem extra..."
+                        value={extraInput}
+                        onChange={(e) => setExtraInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddExtra()}
+                        style={{ flex: 1, fontSize: 14 }}
+                      />
+                      <button className="btn btn-secondary btn-sm" onClick={handleAddExtra} style={{ flexShrink: 0 }}>
+                        + Agregar
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Comprado — todos los chequeados al final */}
-                  {checkedItems.length > 0 && (
+                  {allChecked.length > 0 && (
                     <div style={{ marginBottom: 20, opacity: 0.7 }}>
-                      {categoryHeader(`✅ Comprado (${checkedItems.length})`)}
-                      {checkedItems.map(({ item, cat }) => itemRow(item, cat))}
+                      {categoryHeader(`✅ Comprado (${allChecked.length})`)}
+                      {allChecked.map(({ item, cat, isExtra }) => isExtra
+                        ? (
+                          <div
+                            key={item.name}
+                            onClick={() => toggleExtra(item.name, item.checked)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #F3F4F6', cursor: 'pointer', userSelect: 'none' }}
+                          >
+                            <div style={{ width: 22, height: 22, borderRadius: 6, border: 'none', background: '#4A7C28', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            </div>
+                            <span style={{ fontSize: 15, color: '#9CA3AF', textDecoration: 'line-through', fontWeight: 500 }}>{item.name}</span>
+                          </div>
+                        )
+                        : itemRow(item, cat)
+                      )}
                     </div>
                   )}
                 </>

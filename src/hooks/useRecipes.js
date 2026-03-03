@@ -23,6 +23,8 @@ export default function useRecipes(householdId) {
     if (householdId) fetchRecipes()
   }, [fetchRecipes, householdId])
 
+  const capitalize = (str) => str.trim().replace(/^(.)/, (c) => c.toUpperCase())
+
   const createRecipe = async ({ name, portions, emoji, category, tags, ingredients, procedure, difficulty }) => {
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
@@ -37,7 +39,7 @@ export default function useRecipes(householdId) {
         .filter((i) => i.name?.trim())
         .map((i, idx) => ({
           recipe_id: recipe.id,
-          name: i.name.trim(),
+          name: capitalize(i.name),
           quantity: i.quantity?.trim() || '',
           sort_order: idx,
         }))
@@ -63,7 +65,7 @@ export default function useRecipes(householdId) {
         .filter((i) => i.name?.trim())
         .map((i, idx) => ({
           recipe_id: id,
-          name: i.name.trim(),
+          name: capitalize(i.name),
           quantity: i.quantity?.trim() || '',
           sort_order: idx,
         }))
