@@ -14,6 +14,7 @@ const emptySlots = () => {
 export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS) {
   const [planId, setPlanId] = useState(null)
   const [slots, setSlots] = useState(emptySlots())
+  const [extras, setExtras] = useState([])
   const [loading, setLoading] = useState(true)
 
   const weekStart = getWeekStart()
@@ -52,6 +53,15 @@ export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS
       if (built[day]) built[day][meal_type] = recipe || null
     })
     setSlots(built)
+
+    // Cargar extras (postres/snacks de la semana)
+    const { data: extraRows } = await supabase
+      .from('plan_extras')
+      .select('recipe_id, recipes(id, name, emoji, portions, category)')
+      .eq('plan_id', plan.id)
+
+    setExtras((extraRows || []).map(({ recipes: r }) => r).filter(Boolean))
+
     setLoading(false)
     return plan.id
   }, [householdId, weekStart])
@@ -69,6 +79,12 @@ export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS
         event: '*',
         schema: 'public',
         table: 'plan_slots',
+        filter: `plan_id=eq.${planId}`,
+      }, () => { fetchPlan() })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'plan_extras',
         filter: `plan_id=eq.${planId}`,
       }, () => { fetchPlan() })
       .subscribe()
@@ -119,13 +135,40 @@ export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS
       await supabase.from('plan_slots').insert(rows)
     }
 
+    // Aplicar extras generados por la IA (si los hay)
+    if (generatedPlan.extras?.length) {
+      await supabase.from('plan_extras').delete().eq('plan_id', planId)
+      const extraRows = generatedPlan.extras.map((recipeId) => ({ plan_id: planId, recipe_id: recipeId }))
+      await supabase.from('plan_extras').insert(extraRows)
+    }
+
     await fetchPlan()
+  }
+
+  const addExtra = async (recipe) => {
+    if (!planId) return
+    if (extras.some((e) => e.id === recipe.id)) return
+    setExtras((prev) => [...prev, recipe])
+    await supabase.from('plan_extras').upsert(
+      { plan_id: planId, recipe_id: recipe.id },
+      { onConflict: 'plan_id,recipe_id' }
+    )
+  }
+
+  const removeExtra = async (recipeId) => {
+    if (!planId) return
+    setExtras((prev) => prev.filter((e) => e.id !== recipeId))
+    await supabase.from('plan_extras').delete()
+      .eq('plan_id', planId)
+      .eq('recipe_id', recipeId)
   }
 
   const clearPlan = async () => {
     if (!planId) return
     await supabase.from('plan_slots').delete().eq('plan_id', planId)
+    await supabase.from('plan_extras').delete().eq('plan_id', planId)
     setSlots(emptySlots())
+    setExtras([])
   }
 
   const hasAnySlot = Object.values(slots).some((d) => d.lunch || d.dinner)
@@ -141,5 +184,5 @@ export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS
     ].filter(Boolean)).size,
   }
 
-  return { planId, slots, loading, hasAnySlot, stats, weekStart, updateSlot, applyGeneratedPlan, clearPlan }
+  return { planId, slots, extras, loading, hasAnySlot, stats, weekStart, updateSlot, applyGeneratedPlan, addExtra, removeExtra, clearPlan }
 }

@@ -45,8 +45,10 @@ El JSON debe tener exactamente esta estructura:
     { "name": "nombre del ingrediente", "quantity": "cantidad y unidad" }
   ],
   "difficulty": "baja|media|alta",
-  "procedure": "pasos para preparar la receta"
+  "procedure": "pasos para preparar la receta",
+  "photo_crop": { "x": 0.0, "y": 0.0, "w": 1.0, "h": 0.5 }
 }
+El campo photo_crop es opcional: si identificás una foto del plato terminado en la imagen (no texto, no íconos, no banners — una foto real de comida), incluí sus coordenadas normalizadas (valores entre 0 y 1 relativos al ancho y alto total de la imagen). Si no hay foto del plato, omití el campo o ponelo en null.
 Si no podés identificar algún campo, usá valores razonables por defecto.
 Para portions, estimá según la cantidad de ingredientes.
 Para category, elegí la más apropiada según los ingredientes principales.

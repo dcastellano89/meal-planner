@@ -9,6 +9,8 @@ export const CATEGORIES = [
   { id: 'ensaladas', label: '🥗 Ensaladas' },
   { id: 'vegetariano', label: '🌱 Vegetariano' },
   { id: 'otros', label: '📦 Otros' },
+  { id: 'postre', label: '🍰 Postres' },
+  { id: 'snack', label: '🍿 Snacks' },
 ]
 
 export default function CategoryFilter({ active, onChange, recipes }) {

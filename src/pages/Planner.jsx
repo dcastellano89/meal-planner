@@ -14,7 +14,7 @@ const DEFAULT_ACTIVE_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie']
 export default function PlannerPage({ household }) {
   const activeDays = household.active_days || DEFAULT_ACTIVE_DAYS
   const { recipes } = useRecipes(household.id)
-  const { slots, loading, hasAnySlot, stats, weekStart, updateSlot, applyGeneratedPlan, clearPlan } = usePlanner(household.id, activeDays)
+  const { slots, extras, loading, hasAnySlot, stats, weekStart, updateSlot, applyGeneratedPlan, addExtra, removeExtra, clearPlan } = usePlanner(household.id, activeDays)
 
   const [generating, setGenerating] = useState(false)
   const [generateError, setGenerateError] = useState('')
@@ -22,11 +22,15 @@ export default function PlannerPage({ household }) {
   const [pickerCategory, setPickerCategory] = useState('todas')
   const [pickerOnlyFavorites, setPickerOnlyFavorites] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
-  const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix' })
+  const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null })
+  const [showExtraPicker, setShowExtraPicker] = useState(false)
+  const [extraPickerFilter, setExtraPickerFilter] = useState('todas')
+
+  const snackRecipes = recipes.filter((r) => r.category === 'postre' || r.category === 'snack')
 
   const openSurvey = () => {
     if (recipes.length < 1) return
-    setSurvey({ fridge: '', specific: '', difficulty: 'mix' })
+    setSurvey({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null })
     setShowSurvey(true)
   }
 
@@ -178,6 +182,49 @@ export default function PlannerPage({ household }) {
             </div>
           </div>
 
+          {/* Sección Esta semana — postres y snacks */}
+          <div style={{ padding: '0 20px 8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1A1A1A' }}>🍰 Esta semana también</div>
+                <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>Postres y snacks para tener a mano</div>
+              </div>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => { setExtraPickerFilter('todas'); setShowExtraPicker(true) }}
+              >
+                + Agregar
+              </button>
+            </div>
+
+            {extras.length === 0 ? (
+              <div style={{
+                border: '1.5px dashed #D1D5DB', borderRadius: 12, padding: '16px',
+                textAlign: 'center', color: '#9CA3AF', fontSize: 13,
+              }}>
+                Ningún postre o snack por ahora
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {extras.map((recipe) => (
+                  <div key={recipe.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: '#FDF4FF', border: '1.5px solid #E9D5FF',
+                    borderRadius: 20, padding: '6px 12px', fontSize: 13, color: '#6B21A8',
+                  }}>
+                    <span>{recipe.emoji} {recipe.name}</span>
+                    <button
+                      onClick={() => removeExtra(recipe.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#A855F7', fontSize: 16, lineHeight: 1, padding: 0, marginLeft: 2 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {generateError && (
             <p style={{ textAlign: 'center', fontSize: 13, color: '#DC2626', padding: '0 20px 8px' }}>{generateError}</p>
           )}
@@ -245,6 +292,37 @@ export default function PlannerPage({ household }) {
               </div>
             </div>
 
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 8 }}>
+                ¿Querés sumar algún postre o snack para la semana?
+              </label>
+              {snackRecipes.length > 0 ? (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[
+                    { value: true, label: '🍰 Sí, sugerime' },
+                    { value: false, label: 'No, solo comidas' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={String(value)}
+                      onClick={() => setSurvey((s) => ({ ...s, includeSnacks: value }))}
+                      style={{
+                        flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        border: `2px solid ${survey.includeSnacks === value ? '#7C3AED' : '#E8EDE0'}`,
+                        background: survey.includeSnacks === value ? '#F5F3FF' : 'white',
+                        color: survey.includeSnacks === value ? '#7C3AED' : '#6B7280',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>
+                  No tenés recetas de postre o snack cargadas. Agregá alguna desde la sección Recetas para poder incluirlas.
+                </p>
+              )}
+            </div>
+
             <button className="btn btn-primary" onClick={() => handleGenerate(survey)}>
               ✨ Generar menú
             </button>
@@ -255,6 +333,59 @@ export default function PlannerPage({ household }) {
               Cancelar
             </button>
           </div>
+        </Modal>
+      )}
+
+      {/* Extra Picker Modal */}
+      {showExtraPicker && (
+        <Modal onClose={() => setShowExtraPicker(false)} title="Agregar postre o snack">
+          {snackRecipes.length === 0 ? (
+            <p style={{ fontSize: 14, color: '#6B7280', textAlign: 'center', padding: '24px 0' }}>
+              No tenés recetas de postre o snack. Cargá una desde la sección Recetas.
+            </p>
+          ) : (() => {
+            const filtered = snackRecipes.filter((r) =>
+              extraPickerFilter === 'todas' || r.category === extraPickerFilter
+            ).filter((r) => !extras.some((e) => e.id === r.id))
+            return (
+              <>
+                <div className="pill-tabs" style={{ marginBottom: 12 }}>
+                  {[{ id: 'todas', label: 'Todas' }, { id: 'postre', label: '🍰 Postres' }, { id: 'snack', label: '🍿 Snacks' }]
+                    .filter((cat) => cat.id === 'todas' || snackRecipes.some((r) => r.category === cat.id))
+                    .map((cat) => (
+                      <button
+                        key={cat.id}
+                        className={`pill-tab ${extraPickerFilter === cat.id ? 'active' : ''}`}
+                        onClick={() => setExtraPickerFilter(cat.id)}
+                      >
+                        {cat.label}
+                      </button>
+                    ))
+                  }
+                </div>
+                {filtered.length === 0 ? (
+                  <p style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', padding: '16px 0' }}>
+                    Ya agregaste todas las recetas disponibles de esta categoría.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {filtered.map((r) => (
+                      <div key={r.id} className="recipe-card" onClick={() => { addExtra(r); setShowExtraPicker(false) }}>
+                        <div className="recipe-emoji" style={{ width: 44, height: 44, fontSize: 24 }}>{r.emoji}</div>
+                        <div className="recipe-info">
+                          <div className="recipe-name">{r.name}</div>
+                          <div className="recipe-meta">{r.category === 'postre' ? '🍰 Postre' : '🍿 Snack'}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )
+          })()}
+          <button className="btn btn-ghost" style={{ width: '100%', marginTop: 12 }} onClick={() => setShowExtraPicker(false)}>
+            Cancelar
+          </button>
         </Modal>
       )}
 

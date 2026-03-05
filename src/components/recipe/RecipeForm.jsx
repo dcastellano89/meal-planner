@@ -164,7 +164,7 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
               </div>
             </div>
           )}
-          <ImageUploader onExtracted={handleImageExtracted} onError={setImageError} />
+          <ImageUploader onExtracted={handleImageExtracted} onError={setImageError} onPhotoFile={handleCropConfirm} />
         </>
       )}
 
@@ -348,21 +348,30 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
           <div className="input-group">
             <label className="input-label">Foto del plato <span style={{ fontWeight: 400, color: '#9CA3AF' }}>(opcional)</span></label>
             {dishPhotoPreview ? (
-              <div style={{ position: 'relative', display: 'inline-block' }}>
+              <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                 <img
                   src={dishPhotoPreview}
                   alt="Foto del plato"
                   style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 12, display: 'block' }}
                 />
-                <button
-                  onClick={handleRemovePhoto}
-                  style={{
-                    position: 'absolute', top: 8, right: 8,
-                    background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none',
-                    borderRadius: '50%', width: 28, height: 28, fontSize: 16,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >×</button>
+                <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setCropperSrc(dishPhotoPreview)}
+                    style={{
+                      background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none',
+                      borderRadius: 20, padding: '4px 10px', fontSize: 12, fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >✂ Ajustar</button>
+                  <button
+                    onClick={handleRemovePhoto}
+                    style={{
+                      background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none',
+                      borderRadius: '50%', width: 28, height: 28, fontSize: 16,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >×</button>
+                </div>
               </div>
             ) : (
               <div

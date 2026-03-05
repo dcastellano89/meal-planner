@@ -6,7 +6,10 @@ const DEFAULT_ACTIVE_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie']
 export const generateWeeklyMenu = async ({ recipes, persons, activeDays = DEFAULT_ACTIVE_DAYS, preferences = null }) => {
   const totalSlots = activeDays.length * 2
 
-  const slotsPerRecipe = recipes.map((r) => ({
+  const mainRecipes = recipes.filter((r) => r.category !== 'postre' && r.category !== 'snack')
+  const snackRecipes = recipes.filter((r) => r.category === 'postre' || r.category === 'snack')
+
+  const slotsPerRecipe = mainRecipes.map((r) => ({
     id: r.id,
     name: r.name,
     portions: r.portions,
@@ -19,6 +22,13 @@ export const generateWeeklyMenu = async ({ recipes, persons, activeDays = DEFAUL
     .map((d) => `    "${d}": { "lunch": "recipe_id_o_null", "dinner": "recipe_id_o_null" }`)
     .join(',\n')
 
+  const includeSnacks = preferences?.includeSnacks === true
+  const snackSection = includeSnacks && snackRecipes.length > 0
+    ? `\n\nTambién sugerí entre 1 y 3 recetas de postre/snack para tener en la semana (sin asignarles día), eligiendo de esta lista:\n${JSON.stringify(snackRecipes.map((r) => ({ id: r.id, name: r.name, emoji: r.emoji, category: r.category })), null, 2)}\nAgregá el campo "extras" al JSON con un array de IDs. Si no hay disponibles, dejá "extras": [].`
+    : ''
+
+  const extrasStructure = includeSnacks ? ',\n  "extras": ["recipe_id_1", "recipe_id_2"]' : ''
+
   const response = await callClaude({
     system: `Sos un asistente de planificación de comidas.
 Respondé ÚNICAMENTE con un objeto JSON válido, sin texto adicional, sin bloques de código.
@@ -26,7 +36,7 @@ El JSON debe tener exactamente esta estructura:
 {
   "plan": {
 ${dayStructure}
-  }
+  }${extrasStructure}
 }`,
     messages: [
       {
@@ -56,10 +66,10 @@ ${preferences.specific ? `- Receta o comida que quiere incluir: ${preferences.sp
 Reglas adicionales por las preferencias:
 - Si indicó ingredientes en heladera, priorizá recetas que los usen
 - Si mencionó una receta o tipo de comida específico, incluíla
-- Respetá la dificultad deseada en la medida de lo posible` : ''}`,
+- Respetá la dificultad deseada en la medida de lo posible` : ''}${snackSection}`,
       },
     ],
-    maxTokens: 1000,
+    maxTokens: 1200,
   })
 
   const raw = response.content[0].text.trim()
@@ -74,5 +84,10 @@ Reglas adicionales por las preferencias:
       dinner: parsed.plan?.[day]?.dinner || null,
     }
   })
+
+  if (includeSnacks) {
+    plan.extras = (parsed.extras || []).filter(Boolean)
+  }
+
   return plan
 }

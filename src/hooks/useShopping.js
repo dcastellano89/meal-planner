@@ -37,15 +37,26 @@ export default function useShopping(householdId) {
       .select('recipe_id')
       .eq('plan_id', plan.id)
 
-    const recipeIds = [...new Set((slots || []).map((s) => s.recipe_id).filter(Boolean))]
+    // Extras del plan (postres/snacks)
+    const { data: extraSlots } = await supabase
+      .from('plan_extras')
+      .select('recipe_id')
+      .eq('plan_id', plan.id)
+
+    const allSlotItems = [
+      ...(slots || []),
+      ...(extraSlots || []),
+    ]
+
+    const recipeIds = [...new Set(allSlotItems.map((s) => s.recipe_id).filter(Boolean))]
 
     // Recetas con ingredientes
     const recipes = recipeIds.length > 0
       ? (await supabase.from('recipes').select('id, ingredients(name, quantity, sort_order)').in('id', recipeIds)).data || []
       : []
 
-    // Lista de compras de recetas
-    const list = buildShoppingList(slots || [], recipes)
+    // Lista de compras de recetas (slots + extras juntos)
+    const list = buildShoppingList(allSlotItems, recipes)
 
     // Estados de tildado (solo ítems de recetas)
     const { data: checkedItems } = await supabase

@@ -1,6 +1,25 @@
 import { useState, useRef } from 'react'
 import { extractRecipeFromImages } from '../../services/recipeExtractor'
 
+const cropFileByCoords = (file, { x, y, w, h }) =>
+  new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const sx = Math.round(img.width * x)
+      const sy = Math.round(img.height * y)
+      const sw = Math.round(img.width * w)
+      const sh = Math.round(img.height * h)
+      const canvas = document.createElement('canvas')
+      canvas.width = sw
+      canvas.height = sh
+      canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
+      canvas.toBlob((blob) => resolve(new File([blob], 'dish-photo.jpg', { type: 'image/jpeg' })), 'image/jpeg', 0.92)
+    }
+    img.src = url
+  })
+
 export default function ImageUploader({ onExtracted, onError, onPhotoFile }) {
   const [files, setFiles] = useState([])
   const [step, setStep] = useState('upload') // 'upload' | 'analyzing' | 'done'
@@ -18,7 +37,10 @@ export default function ImageUploader({ onExtracted, onError, onPhotoFile }) {
       const recipe = await extractRecipeFromImages(files)
       setStep('done')
       onExtracted(recipe)
-      if (onPhotoFile && files[0]) onPhotoFile(files[0])
+      if (onPhotoFile && recipe.photo_crop && files[0]) {
+        const croppedFile = await cropFileByCoords(files[0], recipe.photo_crop)
+        onPhotoFile(croppedFile)
+      }
     } catch (err) {
       setStep('upload')
       onError(err.message || 'No pudimos leer la receta. Intentá con otra imagen o cargala manualmente.')

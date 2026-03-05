@@ -8,6 +8,7 @@ import RecipesPage from './pages/Recipes'
 import PlannerPage from './pages/Planner'
 import ShoppingPage from './pages/Shopping'
 import ConfigPage from './pages/Config'
+import GeneratorPage from './pages/Generator'
 import BottomNav from './components/layout/BottomNav'
 
 // Detect and consume /join/:code from the URL on first load
@@ -112,6 +113,7 @@ export default function App() {
   const screens = {
     recipes: <RecipesPage household={household} />,
     planner: <PlannerPage household={household} />,
+    generator: <GeneratorPage household={household} onTabChange={setTab} />,
     shopping: <ShoppingPage household={household} />,
     config: <ConfigPage household={household} setHousehold={setHousehold} user={session.user} />,
   }
