@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { extractRecipeFromImages } from '../../services/recipeExtractor'
 
-export default function ImageUploader({ onExtracted, onError }) {
+export default function ImageUploader({ onExtracted, onError, onPhotoFile }) {
   const [files, setFiles] = useState([])
   const [step, setStep] = useState('upload') // 'upload' | 'analyzing' | 'done'
   const inputRef = useRef()
@@ -18,6 +18,7 @@ export default function ImageUploader({ onExtracted, onError }) {
       const recipe = await extractRecipeFromImages(files)
       setStep('done')
       onExtracted(recipe)
+      if (onPhotoFile && files[0]) onPhotoFile(files[0])
     } catch (err) {
       setStep('upload')
       onError(err.message || 'No pudimos leer la receta. Intentá con otra imagen o cargala manualmente.')

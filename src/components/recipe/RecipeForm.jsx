@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Modal from '../ui/Modal'
 import ImageUploader from './ImageUploader'
+import ImageCropper from '../ui/ImageCropper'
 import { CATEGORIES } from './CategoryFilter'
 
 const EMOJIS = ['🍗', '🍝', '🥩', '🥚', '🫘', '🥗', '🍲', '🥘', '🌮', '🍛', '🥙', '🍜', '🥧', '🐟', '🍚']
@@ -41,6 +42,11 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [imageError, setImageError] = useState('')
+  const [dishPhotoFile, setDishPhotoFile] = useState(null)
+  const [dishPhotoPreview, setDishPhotoPreview] = useState(initialData?.dish_photo_url || null)
+  const [removeDishPhoto, setRemoveDishPhoto] = useState(false)
+  const [cropperSrc, setCropperSrc] = useState(null)
+  const photoInputRef = useRef()
 
   const updateIng = (i, field, val) =>
     setForm((f) => {
@@ -70,6 +76,9 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
         tags: form.tags,
         ingredients: form.ingredients.filter((i) => i.name.trim()),
         procedure: form.procedure.trim() || null,
+        dishPhotoFile: dishPhotoFile || null,
+        removeDishPhoto,
+        currentDishPhotoUrl: initialData?.dish_photo_url || null,
       })
       onClose()
     } catch (e) {
@@ -94,7 +103,36 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
     setAddTab('review')
   }
 
+  const handleManualPhotoChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCropperSrc(URL.createObjectURL(file))
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+
+  const handleCropConfirm = (croppedFile) => {
+    setDishPhotoFile(croppedFile)
+    setDishPhotoPreview(URL.createObjectURL(croppedFile))
+    setRemoveDishPhoto(false)
+    setCropperSrc(null)
+  }
+
+  const handleRemovePhoto = () => {
+    setDishPhotoFile(null)
+    setDishPhotoPreview(null)
+    setRemoveDishPhoto(true)
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+
   return (
+    <>
+    {cropperSrc && (
+      <ImageCropper
+        imageSrc={cropperSrc}
+        onConfirm={handleCropConfirm}
+        onCancel={() => setCropperSrc(null)}
+      />
+    )}
     <Modal onClose={onClose} title={initialData ? 'Editar receta' : 'Nueva receta'}>
       {!initialData && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -307,6 +345,37 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
             />
           </div>
 
+          <div className="input-group">
+            <label className="input-label">Foto del plato <span style={{ fontWeight: 400, color: '#9CA3AF' }}>(opcional)</span></label>
+            {dishPhotoPreview ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img
+                  src={dishPhotoPreview}
+                  alt="Foto del plato"
+                  style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 12, display: 'block' }}
+                />
+                <button
+                  onClick={handleRemovePhoto}
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    background: 'rgba(0,0,0,0.55)', color: 'white', border: 'none',
+                    borderRadius: '50%', width: 28, height: 28, fontSize: 16,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >×</button>
+              </div>
+            ) : (
+              <div
+                style={{ border: '2px dashed #C5E89A', borderRadius: 12, padding: '24px 16px', textAlign: 'center', background: '#F9FBF5', cursor: 'pointer' }}
+                onClick={() => photoInputRef.current?.click()}
+              >
+                <div style={{ fontSize: 32, marginBottom: 6 }}>📷</div>
+                <p style={{ fontSize: 13, color: '#6B7280' }}>Tocá para subir foto del plato terminado</p>
+                <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleManualPhotoChange} />
+              </div>
+            )}
+          </div>
+
           {error && <p style={{ fontSize: 13, color: '#DC2626', marginBottom: 12 }}>{error}</p>}
 
           <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
@@ -318,5 +387,6 @@ export default function RecipeForm({ onSave, onClose, initialData = null, sugges
         </>
       )}
     </Modal>
+    </>
   )
 }

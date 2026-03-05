@@ -5,7 +5,13 @@ const DIFFICULTY_ICON = { baja: '🟢', media: '🟡', alta: '🔴' }
 export default function RecipeCard({ recipe, onClick, onToggleFavorite }) {
   return (
     <div className="recipe-card" onClick={onClick}>
-      <div className="recipe-emoji">{recipe.emoji}</div>
+      {recipe.dish_photo_url ? (
+        <div style={{ width: 52, height: 52, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
+          <img src={recipe.dish_photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      ) : (
+        <div className="recipe-emoji">{recipe.emoji}</div>
+      )}
       <div className="recipe-info">
         <div className="recipe-name">{recipe.name}</div>
         <div className="recipe-meta">

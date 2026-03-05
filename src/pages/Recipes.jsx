@@ -113,6 +113,11 @@ export default function RecipesPage({ household }) {
 
       {showDetail && !showEdit && (
         <Modal onClose={() => { setShowDetail(null); setDeleteConfirm(false) }}>
+          {showDetail.dish_photo_url && (
+            <div style={{ margin: '-20px -20px 20px', borderRadius: '16px 16px 0 0', overflow: 'hidden', height: 180 }}>
+              <img src={showDetail.dish_photo_url} alt={showDetail.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 52, width: 72, height: 72, background: '#E8F5D0', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {showDetail.emoji}

@@ -19,3 +19,33 @@ export const resetPassword = (email) =>
   supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin,
   })
+
+const compressImage = (file, maxPx = 800, quality = 0.82) =>
+  new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality)
+    }
+    img.src = url
+  })
+
+export const uploadDishPhoto = async (file) => {
+  const compressed = await compressImage(file)
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
+  const { error } = await supabase.storage.from('recipe-photos').upload(path, compressed, { contentType: 'image/jpeg', upsert: false })
+  if (error) throw error
+  const { data } = supabase.storage.from('recipe-photos').getPublicUrl(path)
+  return data.publicUrl
+}
+
+export const deleteDishPhoto = async (url) => {
+  const path = url.split('/recipe-photos/').pop()
+  if (path) await supabase.storage.from('recipe-photos').remove([path])
+}

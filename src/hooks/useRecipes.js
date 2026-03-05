@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../supabase'
+import { supabase, uploadDishPhoto, deleteDishPhoto } from '../supabase'
 
 export default function useRecipes(householdId) {
   const [recipes, setRecipes] = useState([])
@@ -25,10 +25,13 @@ export default function useRecipes(householdId) {
 
   const capitalize = (str) => str.trim().replace(/^(.)/, (c) => c.toUpperCase())
 
-  const createRecipe = async ({ name, portions, emoji, category, tags, ingredients, procedure, difficulty }) => {
+  const createRecipe = async ({ name, portions, emoji, category, tags, ingredients, procedure, difficulty, dishPhotoFile }) => {
+    let dish_photo_url = null
+    if (dishPhotoFile) dish_photo_url = await uploadDishPhoto(dishPhotoFile)
+
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
-      .insert({ household_id: householdId, name, portions, emoji, category, tags, procedure: procedure || null, difficulty: difficulty || 'media' })
+      .insert({ household_id: householdId, name, portions, emoji, category, tags, procedure: procedure || null, difficulty: difficulty || 'media', dish_photo_url })
       .select()
       .single()
 
@@ -51,10 +54,20 @@ export default function useRecipes(householdId) {
     return recipe
   }
 
-  const updateRecipe = async (id, { name, portions, emoji, category, tags, ingredients, procedure, difficulty }) => {
+  const updateRecipe = async (id, { name, portions, emoji, category, tags, ingredients, procedure, difficulty, dishPhotoFile, removeDishPhoto, currentDishPhotoUrl }) => {
+    let dish_photo_url = currentDishPhotoUrl || null
+    if (removeDishPhoto && currentDishPhotoUrl) {
+      await deleteDishPhoto(currentDishPhotoUrl)
+      dish_photo_url = null
+    }
+    if (dishPhotoFile) {
+      if (currentDishPhotoUrl && !removeDishPhoto) await deleteDishPhoto(currentDishPhotoUrl)
+      dish_photo_url = await uploadDishPhoto(dishPhotoFile)
+    }
+
     const { error: recipeError } = await supabase
       .from('recipes')
-      .update({ name, portions, emoji, category, tags, procedure: procedure || null, difficulty: difficulty || 'media' })
+      .update({ name, portions, emoji, category, tags, procedure: procedure || null, difficulty: difficulty || 'media', dish_photo_url })
       .eq('id', id)
 
     if (recipeError) throw recipeError

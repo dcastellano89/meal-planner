@@ -1,23 +1,31 @@
 import callClaude from './claudeApi'
 
-const fileToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+const resizeForClaude = (file, maxPx = 1200) =>
+  new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.9))
+    }
+    img.src = url
   })
 
 export const extractRecipeFromImages = async (imageFiles) => {
   const imageContents = await Promise.all(
     imageFiles.map(async (file) => {
-      const base64 = await fileToBase64(file)
+      const base64url = await resizeForClaude(file)
       return {
         type: 'image',
         source: {
           type: 'base64',
-          media_type: file.type,
-          data: base64.split(',')[1],
+          media_type: 'image/jpeg',
+          data: base64url.split(',')[1],
         },
       }
     })
