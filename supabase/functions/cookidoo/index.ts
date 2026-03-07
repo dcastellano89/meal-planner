@@ -320,6 +320,194 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders })
     }
 
+    // --- SYNC COOKIDOO RECIPES ---
+    if (action === 'sync-cookidoo-recipes') {
+      const { data: connection } = await supabase
+        .from('cookidoo_connections')
+        .select('*')
+        .eq('household_id', member.household_id)
+        .single()
+
+      if (!connection) {
+        return new Response(JSON.stringify({ error: 'Cookidoo no está conectado' }), { status: 400, headers: corsHeaders })
+      }
+
+      const selectedCollections: { id: string; name: string; type: string }[] = connection.selected_collections ?? []
+      if (!selectedCollections.length) {
+        return new Response(JSON.stringify({ error: 'No hay colecciones seleccionadas' }), { status: 400, headers: corsHeaders })
+      }
+
+      const token = await getValidToken(supabase, connection)
+      const lang = connection.language
+      const country = connection.country
+
+      const selectedIds = new Set(selectedCollections.map((c) => c.id))
+
+      // Usar los mismos endpoints de lista completa que ya sabemos que funcionan
+      const [managedRes, customRes] = await Promise.all([
+        fetch(`${apiBase(country)}/organize/${lang}/api/managed-list`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.vorwerk.organize.managed-list.mobile+json',
+            'User-Agent': 'Thermomix/5427 (iPhone; iOS11.2; Scale/3.00)',
+          },
+        }),
+        fetch(`${apiBase(country)}/organize/${lang}/api/custom-list`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.vorwerk.organize.custom-list.mobile+json',
+            'User-Agent': 'Thermomix/5427 (iPhone; iOS11.2; Scale/3.00)',
+          },
+        }),
+      ])
+
+      // Recopilar todos los IDs de recetas de las colecciones seleccionadas
+      const recipeIds = new Set<string>()
+
+      const extractFromLists = (lists: { id: string; chapters?: { recipes?: { id?: string; recipeId?: string }[] }[] }[]) => {
+        for (const list of lists) {
+          if (!selectedIds.has(list.id)) continue
+          for (const chapter of list.chapters ?? []) {
+            for (const r of chapter.recipes ?? []) {
+              const id = r.id ?? r.recipeId
+              if (id) recipeIds.add(String(id))
+            }
+          }
+        }
+      }
+
+      if (managedRes.ok) {
+        const data = await managedRes.json()
+        extractFromLists(data.managedlists ?? [])
+      }
+      if (customRes.ok) {
+        const data = await customRes.json()
+        extractFromLists(data.customlists ?? [])
+      }
+
+      if (!recipeIds.size) {
+        return new Response(JSON.stringify({ synced: 0 }), { headers: corsHeaders })
+      }
+
+      // Obtener IDs de recetas Cookidoo ya existentes para este hogar
+      const { data: existing } = await supabase
+        .from('recipes')
+        .select('id, cookidoo_recipe_id')
+        .eq('household_id', member.household_id)
+        .eq('source', 'cookidoo')
+
+      const existingMap = new Map<string, string>((existing ?? []).map((r: { id: string; cookidoo_recipe_id: string }) => [r.cookidoo_recipe_id, r.id]))
+      const existingIds = new Set(existingMap.keys())
+
+      // IDs a eliminar (ya no están en ninguna colección seleccionada)
+      const toDelete = [...existingIds].filter((id) => !recipeIds.has(id))
+      if (toDelete.length) {
+        const dbIdsToDelete = toDelete.map((cid) => existingMap.get(cid)!).filter(Boolean)
+        if (dbIdsToDelete.length) {
+          await supabase.from('recipes').delete().in('id', dbIdsToDelete)
+        }
+      }
+
+      let synced = 0
+      const errors: string[] = []
+      let debugFirstRecipe: unknown = null
+
+      // Sincronizar cada receta
+      for (const recipeId of recipeIds) {
+        try {
+          const res = await fetch(`${apiBase(country)}/recipes/recipe/${lang}/${recipeId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'User-Agent': 'Thermomix/5427 (iPhone; iOS11.2; Scale/3.00)',
+            },
+          })
+          if (!res.ok) continue
+
+          const data = await res.json()
+          const recipe = data.recipe ?? data
+
+          // Debug: guardar estructura de primera receta
+          if (!debugFirstRecipe) {
+            debugFirstRecipe = {
+              keys: Object.keys(recipe),
+              hasIngredientGroups: !!recipe.recipeIngredientGroups,
+              ingredientGroupsLength: recipe.recipeIngredientGroups?.length ?? 0,
+              firstGroupKeys: recipe.recipeIngredientGroups?.[0] ? Object.keys(recipe.recipeIngredientGroups[0]) : [],
+              firstGroupIngCount: recipe.recipeIngredientGroups?.[0]?.recipeIngredients?.length ?? recipe.recipeIngredientGroups?.[0]?.ingredients?.length ?? 0,
+              firstIngredientKeys: (recipe.recipeIngredientGroups?.[0]?.recipeIngredients?.[0] ?? recipe.recipeIngredientGroups?.[0]?.ingredients?.[0]) ? Object.keys(recipe.recipeIngredientGroups?.[0]?.recipeIngredients?.[0] ?? recipe.recipeIngredientGroups?.[0]?.ingredients?.[0]) : [],
+              rawDataKeys: Object.keys(data),
+            }
+          }
+
+          const name: string = recipe.title ?? recipe.name ?? 'Receta Cookidoo'
+          const portions: number = recipe.numberOfPortions ?? recipe.portions ?? recipe.yield ?? 4
+          const emoji = '🍲'
+          const category = 'otros'
+          const tags: string[] = recipe.tags?.map((t: { text?: string; name?: string }) => t.text ?? t.name).filter(Boolean) ?? []
+
+          // Upsert receta
+          let dbRecipeId: string
+
+          if (existingMap.has(recipeId)) {
+            dbRecipeId = existingMap.get(recipeId)!
+            await supabase
+              .from('recipes')
+              .update({ name, portions, emoji, category, tags })
+              .eq('id', dbRecipeId)
+          } else {
+            const { data: inserted, error: insertErr } = await supabase
+              .from('recipes')
+              .insert({
+                household_id: member.household_id,
+                name,
+                portions,
+                emoji,
+                category,
+                tags,
+                source: 'cookidoo',
+                cookidoo_recipe_id: recipeId,
+              })
+              .select('id')
+              .single()
+            if (insertErr || !inserted) continue
+            dbRecipeId = inserted.id
+          }
+
+          // Actualizar ingredientes
+          await supabase.from('ingredients').delete().eq('recipe_id', dbRecipeId)
+
+          const ingredientGroups: { recipeIngredients?: unknown[]; ingredients?: unknown[] }[] =
+            recipe.recipeIngredientGroups ?? recipe.ingredientGroups ?? []
+
+          type RawIng = { ingredientNotation?: string; ingredient?: { name?: string }; name?: string; quantity?: number | string; amount?: string; unitNotation?: string; quantityUnit?: { name?: string }; unit?: string }
+          const allIngredients: { recipe_id: string; name: string; quantity: string; sort_order: number }[] = []
+          let sortOrder = 0
+          for (const group of ingredientGroups) {
+            const ings = (group.recipeIngredients ?? group.ingredients ?? []) as RawIng[]
+            for (const ing of ings) {
+              const ingName: string = ing.ingredientNotation ?? ing.ingredient?.name ?? ing.name ?? ''
+              if (!ingName) continue
+              const qty = ing.quantity ?? ing.amount ?? ''
+              const unit = ing.unitNotation ?? ing.quantityUnit?.name ?? ing.unit ?? ''
+              const quantity = [qty, unit].filter(Boolean).join(' ')
+              allIngredients.push({ recipe_id: dbRecipeId, name: ingName, quantity, sort_order: sortOrder++ })
+            }
+          }
+
+          if (allIngredients.length) {
+            await supabase.from('ingredients').insert(allIngredients)
+          }
+
+          synced++
+        } catch (e) {
+          errors.push(recipeId)
+        }
+      }
+
+      return new Response(JSON.stringify({ synced, deleted: toDelete.length, errors, debugFirstRecipe }), { headers: corsHeaders })
+    }
+
     return new Response(JSON.stringify({ error: `Acción desconocida: ${action}` }), { status: 400, headers: corsHeaders })
 
   } catch (err) {

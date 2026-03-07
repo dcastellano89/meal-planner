@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Header from '../components/layout/Header'
 import Modal from '../components/ui/Modal'
 import EmptyState from '../components/ui/EmptyState'
+import ThermomixIcon from '../components/ui/ThermomixIcon'
 import useRecipes from '../hooks/useRecipes'
 import usePlanner from '../hooks/usePlanner'
 import { generateWeeklyMenu } from '../services/menuPlanner'
@@ -22,15 +23,17 @@ export default function PlannerPage({ household }) {
   const [pickerCategory, setPickerCategory] = useState('todas')
   const [pickerOnlyFavorites, setPickerOnlyFavorites] = useState(false)
   const [showSurvey, setShowSurvey] = useState(false)
-  const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null })
+  const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null, includeCookidoo: null })
   const [showExtraPicker, setShowExtraPicker] = useState(false)
   const [extraPickerFilter, setExtraPickerFilter] = useState('todas')
 
   const snackRecipes = recipes.filter((r) => r.category === 'postre' || r.category === 'snack')
+  const cookidooRecipes = recipes.filter((r) => r.source === 'cookidoo')
+  const hasCookidoo = cookidooRecipes.length > 0
 
   const openSurvey = () => {
     if (recipes.length < 1) return
-    setSurvey({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null })
+    setSurvey({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null, includeCookidoo: null })
     setShowSurvey(true)
   }
 
@@ -39,7 +42,10 @@ export default function PlannerPage({ household }) {
     setGenerating(true)
     setGenerateError('')
     try {
-      const generated = await generateWeeklyMenu({ recipes, persons: household.persons || 2, activeDays, preferences })
+      // Filtrar recetas según preferencias de Cookidoo
+      const includeCookidoo = preferences?.includeCookidoo !== false
+      const recipesForMenu = includeCookidoo ? recipes : recipes.filter((r) => r.source !== 'cookidoo')
+      const generated = await generateWeeklyMenu({ recipes: recipesForMenu, persons: household.persons || 2, activeDays, preferences })
       await applyGeneratedPlan(generated, recipes)
     } catch (e) {
       setGenerateError('No se pudo generar el menú. Intentá de nuevo.')
@@ -167,7 +173,13 @@ export default function PlannerPage({ household }) {
                           <div className="slot-label">{mealType === 'lunch' ? '🌤 Almuerzo' : '🌙 Cena'}</div>
                           {recipe ? (
                             <>
-                              <div className="slot-recipe">{recipe.emoji} {recipe.name}</div>
+                              <div className="slot-recipe" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {recipe.source === 'cookidoo'
+                                  ? <ThermomixIcon size={14} style={{ flexShrink: 0 }} />
+                                  : <span>{recipe.emoji}</span>
+                                }
+                                {recipe.name}
+                              </div>
                               <div className="slot-portions">{recipe.portions} porciones</div>
                             </>
                           ) : (
@@ -292,6 +304,33 @@ export default function PlannerPage({ household }) {
               </div>
             </div>
 
+            {hasCookidoo && (
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ThermomixIcon size={15} /> ¿Incluir recetas de Cookidoo/Thermomix?
+                </label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[
+                    { value: true, label: 'Sí, incluirlas' },
+                    { value: false, label: 'No, solo las mías' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={String(value)}
+                      onClick={() => setSurvey((s) => ({ ...s, includeCookidoo: value }))}
+                      style={{
+                        flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        border: `2px solid ${survey.includeCookidoo === value ? '#E8B84B' : '#E8EDE0'}`,
+                        background: survey.includeCookidoo === value ? '#FEF9EC' : 'white',
+                        color: survey.includeCookidoo === value ? '#92400E' : '#6B7280',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', display: 'block', marginBottom: 8 }}>
                 ¿Querés sumar algún postre o snack para la semana?
@@ -400,10 +439,14 @@ export default function PlannerPage({ household }) {
               No tenés recetas cargadas todavía.
             </p>
           ) : (() => {
-            const visibleCats = CATEGORIES.filter((c) => c.id === 'todas' || recipes.some((r) => r.category === c.id))
-            const filtered = recipes
-              .filter((r) => pickerCategory === 'todas' || r.category === pickerCategory)
-              .filter((r) => !pickerOnlyFavorites || r.is_favorite)
+            const visibleCats = CATEGORIES.filter((c) => c.id === 'todas' || recipes.some((r) => r.category === c.id && r.source !== 'cookidoo'))
+            const isCookidooPicker = pickerCategory === 'cookidoo'
+            const filtered = isCookidooPicker
+              ? cookidooRecipes
+              : recipes
+                  .filter((r) => r.source !== 'cookidoo')
+                  .filter((r) => pickerCategory === 'todas' || r.category === pickerCategory)
+                  .filter((r) => !pickerOnlyFavorites || r.is_favorite)
             return (
               <>
                 <div className="pill-tabs" style={{ marginBottom: 4 }}>
@@ -416,19 +459,32 @@ export default function PlannerPage({ household }) {
                       {cat.label}
                     </button>
                   ))}
+                  {hasCookidoo && (
+                    <button
+                      className={`pill-tab ${isCookidooPicker ? 'active' : ''}`}
+                      onClick={() => setPickerCategory('cookidoo')}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <ThermomixIcon size={13} /> Cookidoo
+                    </button>
+                  )}
                 </div>
-                <div className="pill-tabs" style={{ marginBottom: 12 }}>
-                  <button
-                    className={`pill-tab ${pickerOnlyFavorites ? 'active' : ''}`}
-                    onClick={() => setPickerOnlyFavorites((v) => !v)}
-                  >
-                    ★ Favoritas
-                  </button>
-                </div>
+                {!isCookidooPicker && (
+                  <div className="pill-tabs" style={{ marginBottom: 12 }}>
+                    <button
+                      className={`pill-tab ${pickerOnlyFavorites ? 'active' : ''}`}
+                      onClick={() => setPickerOnlyFavorites((v) => !v)}
+                    >
+                      ★ Favoritas
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {filtered.map((r) => (
                     <div key={r.id} className="recipe-card" onClick={() => handlePickRecipe(r)}>
-                      <div className="recipe-emoji" style={{ width: 44, height: 44, fontSize: 24 }}>{r.emoji}</div>
+                      <div className="recipe-emoji" style={{ width: 44, height: 44, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {r.source === 'cookidoo' ? <ThermomixIcon size={28} /> : r.emoji}
+                      </div>
                       <div className="recipe-info">
                         <div className="recipe-name">{r.name}</div>
                         <div className="recipe-meta">🍽️ {r.portions} porciones</div>
