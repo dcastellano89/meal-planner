@@ -3,13 +3,43 @@ import Header from '../components/layout/Header'
 import EmptyState from '../components/ui/EmptyState'
 import useShopping from '../hooks/useShopping'
 import { CATEGORY_LABELS } from '../utils/shopping'
+import { supabase } from '../supabase'
 
 export default function ShoppingPage({ household }) {
   const { shoppingList, extras, loading, hasPlan, totalItems, checkedCount, toggleItem, addExtra, removeExtra, toggleExtra, clearChecked } =
     useShopping(household.id)
   const [extraInput, setExtraInput] = useState('')
+  const [syncState, setSyncState] = useState(null) // null | 'loading' | 'ok' | 'error' | 'disconnected'
 
   const hasItems = totalItems > 0
+
+  const handleSyncCookidoo = async () => {
+    // Recoge todos los items pendientes (no chequeados) como strings "Nombre cantidad"
+    const pendingItems = [
+      ...Object.values(shoppingList).flat().filter((i) => !i.checked).map((i) => i.quantity ? `${i.name} ${i.quantity}` : i.name),
+      ...extras.filter((e) => !e.checked).map((e) => e.quantity ? `${e.name} ${e.quantity}` : e.name),
+    ]
+    if (!pendingItems.length) return
+
+    setSyncState('loading')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cookidoo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'sync-shopping', items: pendingItems }),
+      })
+      const data = await res.json()
+      if (data.error) {
+        setSyncState(data.error.includes('no está conectado') ? 'disconnected' : 'error')
+      } else {
+        setSyncState('ok')
+        setTimeout(() => setSyncState(null), 3000)
+      }
+    } catch {
+      setSyncState('error')
+    }
+  }
 
   const handleAddExtra = () => {
     if (!extraInput.trim()) return
@@ -239,18 +269,28 @@ export default function ShoppingPage({ household }) {
             })()}
           </div>
 
-          {/* Botón limpiar checks */}
-          {checkedCount > 0 && (
-            <div style={{ padding: '0 20px 24px' }}>
-              <button
-                className="btn btn-ghost"
-                style={{ width: '100%' }}
-                onClick={clearChecked}
-              >
+          {/* Botones de acción */}
+          <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Sync Cookidoo */}
+            <button
+              className="btn btn-secondary"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              onClick={handleSyncCookidoo}
+              disabled={syncState === 'loading'}
+            >
+              {syncState === 'loading' && 'Enviando a Cookidoo...'}
+              {syncState === 'ok' && '✓ Enviado a Cookidoo'}
+              {syncState === 'error' && 'Error al sincronizar'}
+              {syncState === 'disconnected' && 'Cookidoo no conectado — ir a Configuración'}
+              {syncState === null && 'Enviar lista a Cookidoo'}
+            </button>
+
+            {checkedCount > 0 && (
+              <button className="btn btn-ghost" style={{ width: '100%' }} onClick={clearChecked}>
                 Desmarcar todo
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
     </div>
