@@ -45,7 +45,7 @@ export default function usePlanner(householdId, activeDays = DEFAULT_ACTIVE_DAYS
     // Cargar los slots con datos de la receta
     const { data: slotRows } = await supabase
       .from('plan_slots')
-      .select('day, meal_type, recipe_id, recipes(id, name, emoji, portions, category)')
+      .select('day, meal_type, recipe_id, recipes(id, name, emoji, portions, category, source, cookidoo_recipe_id)')
       .eq('plan_id', plan.id)
 
     const built = emptySlots()

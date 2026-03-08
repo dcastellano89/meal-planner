@@ -3,7 +3,7 @@ import Header from '../components/layout/Header'
 import EmptyState from '../components/ui/EmptyState'
 import useShopping from '../hooks/useShopping'
 import { CATEGORY_LABELS } from '../utils/shopping'
-import { supabase } from '../supabase'
+import { getFreshSession } from '../supabase'
 
 export default function ShoppingPage({ household }) {
   const { shoppingList, extras, loading, hasPlan, totalItems, checkedCount, toggleItem, addExtra, removeExtra, toggleExtra, clearChecked } =
@@ -23,7 +23,7 @@ export default function ShoppingPage({ household }) {
 
     setSyncState('loading')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const session = await getFreshSession()
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cookidoo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },

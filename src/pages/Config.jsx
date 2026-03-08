@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { supabase, signOut } from '../supabase'
+import { supabase, signOut, getFreshSession } from '../supabase'
 import Header from '../components/layout/Header'
 import Modal from '../components/ui/Modal'
+import ThermomixIcon from '../components/ui/ThermomixIcon'
 
 const COOKIDOO_COUNTRIES = [
   { code: 'es', label: 'España' },
@@ -17,7 +18,7 @@ const COOKIDOO_COUNTRIES = [
 ]
 
 async function callCookidoo(action, payload = {}) {
-  const { data: { session } } = await supabase.auth.getSession()
+  const session = await getFreshSession()
   const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cookidoo`, {
     method: 'POST',
     headers: {
@@ -260,8 +261,8 @@ export default function ConfigPage({ household, setHousehold, user }) {
         {/* Thermomix / Cookidoo */}
         <div className="card">
           <div className="card-pad">
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14 }}>
-              Thermomix / Cookidoo
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 13, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 14 }}>
+              <ThermomixIcon size={16} /> Thermomix / Cookidoo
             </div>
 
             {cookidooLoading ? (

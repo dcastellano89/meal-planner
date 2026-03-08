@@ -8,6 +8,7 @@ import usePlanner from '../hooks/usePlanner'
 import { generateWeeklyMenu } from '../services/menuPlanner'
 import { formatWeekRange } from '../utils/portions'
 import { CATEGORIES } from '../components/recipe/CategoryFilter'
+import { getFreshSession } from '../supabase'
 
 const ALL_DAYS_FULL = { lun: 'Lunes', mar: 'Martes', mie: 'Miércoles', jue: 'Jueves', vie: 'Viernes', sab: 'Sábado', dom: 'Domingo' }
 const DEFAULT_ACTIVE_DAYS = ['lun', 'mar', 'mie', 'jue', 'vie']
@@ -26,6 +27,26 @@ export default function PlannerPage({ household }) {
   const [survey, setSurvey] = useState({ fridge: '', specific: '', difficulty: 'mix', includeSnacks: null, includeCookidoo: null })
   const [showExtraPicker, setShowExtraPicker] = useState(false)
   const [extraPickerFilter, setExtraPickerFilter] = useState('todas')
+  const [cookTodayState, setCookTodayState] = useState({}) // recipeId → 'loading'|'ok'|'error'
+
+  const handleCookToday = async (e, cookidooRecipeId) => {
+    e.stopPropagation()
+    if (cookTodayState[cookidooRecipeId] === 'loading') return
+    setCookTodayState((s) => ({ ...s, [cookidooRecipeId]: 'loading' }))
+    try {
+      const session = await getFreshSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cookidoo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'cook-today', cookidooRecipeId }),
+      })
+      const data = await res.json()
+      setCookTodayState((s) => ({ ...s, [cookidooRecipeId]: data.ok ? 'ok' : 'error' }))
+      setTimeout(() => setCookTodayState((s) => { const n = { ...s }; delete n[cookidooRecipeId]; return n }), 3000)
+    } catch {
+      setCookTodayState((s) => ({ ...s, [cookidooRecipeId]: 'error' }))
+    }
+  }
 
   const snackRecipes = recipes.filter((r) => r.category === 'postre' || r.category === 'snack')
   const cookidooRecipes = recipes.filter((r) => r.source === 'cookidoo')
@@ -160,7 +181,7 @@ export default function PlannerPage({ household }) {
             <button className="btn btn-secondary btn-sm" onClick={clearPlan}>Limpiar</button>
           </div>
 
-          <div className="section-pad">
+          <div className="section-pad" style={{ paddingBottom: 20 }}>
             <div className="week-grid">
               {activeDays.map((day) => (
                 <div key={day} className="day-row">
@@ -180,7 +201,19 @@ export default function PlannerPage({ household }) {
                                 }
                                 {recipe.name}
                               </div>
-                              <div className="slot-portions">{recipe.portions} porciones</div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div className="slot-portions">{recipe.portions} porciones</div>
+                                {recipe.source === 'cookidoo' && recipe.cookidoo_recipe_id && (
+                                  <button
+                                    onClick={(e) => handleCookToday(e, recipe.cookidoo_recipe_id)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 3, background: cookTodayState[recipe.cookidoo_recipe_id] === 'ok' ? '#D1FAE5' : cookTodayState[recipe.cookidoo_recipe_id] === 'error' ? '#FEE2E2' : '#F0FDF4', border: 'none', borderRadius: 8, padding: '3px 7px', fontSize: 11, fontWeight: 600, color: cookTodayState[recipe.cookidoo_recipe_id] === 'error' ? '#DC2626' : '#15803D', cursor: 'pointer' }}
+                                    title="Agregar al plan de cocción de hoy en Cookidoo"
+                                  >
+                                    <ThermomixIcon size={10} />
+                                    {cookTodayState[recipe.cookidoo_recipe_id] === 'loading' ? '...' : cookTodayState[recipe.cookidoo_recipe_id] === 'ok' ? '✓' : cookTodayState[recipe.cookidoo_recipe_id] === 'error' ? '✗' : 'Cocinar hoy'}
+                                  </button>
+                                )}
+                              </div>
                             </>
                           ) : (
                             <div className="slot-empty">Sin asignar</div>
@@ -195,7 +228,7 @@ export default function PlannerPage({ household }) {
           </div>
 
           {/* Sección Esta semana — postres y snacks */}
-          <div style={{ padding: '0 20px 8px' }}>
+          <div style={{ padding: '4px 20px 8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#1A1A1A' }}>🍰 Esta semana también</div>

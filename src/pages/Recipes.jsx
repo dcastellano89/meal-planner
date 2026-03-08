@@ -8,7 +8,7 @@ import EmptyState from '../components/ui/EmptyState'
 import Tag from '../components/ui/Tag'
 import ThermomixIcon from '../components/ui/ThermomixIcon'
 import useRecipes from '../hooks/useRecipes'
-import { supabase } from '../supabase'
+import { supabase, getFreshSession } from '../supabase'
 
 export default function RecipesPage({ household }) {
   const { recipes, loading, createRecipe, updateRecipe, deleteRecipe, toggleFavorite, ingredientSuggestions, refetch } = useRecipes(household.id)
@@ -19,12 +19,13 @@ export default function RecipesPage({ household }) {
   const [activeDifficulty, setActiveDifficulty] = useState('todas')
   const [onlyFavorites, setOnlyFavorites] = useState(false)
   const [visibleCount, setVisibleCount] = useState(20)
+  const [searchText, setSearchText] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [syncState, setSyncState] = useState(null) // null | 'loading' | 'ok' | 'error' | 'no-collections'
   const [cookidooConnected, setCookidooConnected] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getFreshSession().then((session) => {
       if (!session) return
       fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cookidoo`, {
         method: 'POST',
@@ -40,13 +41,20 @@ export default function RecipesPage({ household }) {
   const isCookidooView = activeCategory === 'cookidoo'
   const showCookidooTab = cookidooConnected || recipes.some((r) => r.source === 'cookidoo')
 
+  const searchLower = searchText.toLowerCase().trim()
+  const matchesSearch = (r) => !searchLower
+    || r.name?.toLowerCase().includes(searchLower)
+    || r.tags?.some((t) => t.toLowerCase().includes(searchLower))
+    || r.ingredients?.some((i) => i.name?.toLowerCase().includes(searchLower))
+
   const filtered = isCookidooView
-    ? recipes.filter((r) => r.source === 'cookidoo')
+    ? recipes.filter((r) => r.source === 'cookidoo').filter(matchesSearch)
     : recipes
         .filter((r) => r.source !== 'cookidoo')
         .filter((r) => activeCategory === 'todas' || r.category === activeCategory)
         .filter((r) => activeDifficulty === 'todas' || r.difficulty === activeDifficulty)
         .filter((r) => !onlyFavorites || r.is_favorite)
+        .filter(matchesSearch)
 
   const visibleRecipes = filtered.slice(0, visibleCount)
   const hasMore = filtered.length > visibleCount
@@ -59,7 +67,7 @@ export default function RecipesPage({ household }) {
   const handleSyncCookidoo = async () => {
     setSyncState('loading')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const session = await getFreshSession()
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cookidoo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
@@ -143,7 +151,17 @@ export default function RecipesPage({ household }) {
         </>
       )}
 
-      <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ padding: '0 20px 8px' }}>
+        <input
+          type="search"
+          value={searchText}
+          onChange={(e) => { setSearchText(e.target.value); setVisibleCount(20) }}
+          placeholder="Buscar por nombre, tag o ingrediente..."
+          style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1.5px solid #E8EDE0', fontSize: 14, outline: 'none', background: '#FAFAF8', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      <div style={{ padding: '4px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '48px 0', color: '#6B7280', fontSize: 14 }}>
             Cargando recetas...
@@ -204,12 +222,7 @@ export default function RecipesPage({ household }) {
       )}
 
       {showDetail && !showEdit && (
-        <Modal onClose={() => { setShowDetail(null); setDeleteConfirm(false) }}>
-          {showDetail.dish_photo_url && (
-            <div style={{ margin: '-20px -20px 20px', borderRadius: '16px 16px 0 0', overflow: 'hidden', height: 180 }}>
-              <img src={showDetail.dish_photo_url} alt={showDetail.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-          )}
+        <Modal onClose={() => { setShowDetail(null); setDeleteConfirm(false) }} headerImage={showDetail.dish_photo_url}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
             <div style={{ fontSize: 52, width: 72, height: 72, background: '#E8F5D0', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {showDetail.source === 'cookidoo'

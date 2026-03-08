@@ -1,7 +1,7 @@
 const NAV_ITEMS = [
   { id: 'recipes', icon: '📖', label: 'Recetas' },
-  { id: 'planner', icon: '📅', label: 'Semana' },
   { id: 'generator', icon: '🧑‍🍳', label: 'Cocinar' },
+  { id: 'planner', icon: '📅', label: 'Semana' },
   { id: 'shopping', icon: '🛒', label: 'Compras' },
   { id: 'config', icon: '⚙️', label: 'Config' },
 ]

@@ -15,6 +15,18 @@ export const signOut = () => supabase.auth.signOut()
 
 export const getSession = () => supabase.auth.getSession()
 
+// Devuelve una sesión con token fresco, forzando refresh si está por expirar o ya expiró
+export const getFreshSession = async () => {
+  let { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+  const expiresAt = (session.expires_at ?? 0) * 1000
+  if (Date.now() > expiresAt - 60000) {
+    const { data } = await supabase.auth.refreshSession()
+    return data.session
+  }
+  return session
+}
+
 export const resetPassword = (email) =>
   supabase.auth.resetPasswordForEmail(email, {
     redirectTo: window.location.origin,
